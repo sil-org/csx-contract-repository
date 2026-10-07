@@ -165,7 +165,7 @@ Yes/No flags: confidentiality, auto-renewal, assignment consent, indemnification
 | **C. Buy an off-the-shelf repository** | e.g., a lightweight CLM | Fastest | Cost; outside "build it ourselves" intent |
 
 Notes:
-- A separate existing app (`btc-abstracts`) uses Vite, Tailwind, Supabase, and Google OAuth. If the IDP is Google, that stack could be reused for Option A,.
+- A separate existing app (`btc-abstracts`) uses Vite, Tailwind, Supabase, and Google OAuth. If the IDP is Google, that stack could be reused for Option A.
 - Object storage must support **versioning and object lock/WORM** to enforce R-D2.
 - Secrets and credentials are never committed; use GitHub/host secrets.
 
