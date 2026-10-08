@@ -1,6 +1,6 @@
 # Contract Repository — Requirements Specification
 
-**Status:** Draft v0.2 · 2026-10-08
+**Status:** Draft v0.3 · 2026-10-08
 **Owner:** Kate Brenner
 **Purpose:** A GitHub-hosted, IDP-authenticated repository of record for organizational agreements (MOUs, SOWs, vendor contracts), with preserved original copies and deadline reminders.
 
@@ -166,10 +166,13 @@ Yes/No flags: confidentiality, auto-renewal, assignment consent, indemnification
 
 **Decision (2026-10-08): Option A**, built on `sil-app-template` (the same stack as `license-manager`):
 - Frontend: React + Vite + Tailwind on AWS Amplify Hosting, connected to this repo (builds on push to `main`).
-- Backend: Supabase (Postgres + Auth + RLS). Business rules live in Postgres functions; migrations are numbered SQL files.
+- Backend: the **same Supabase project as `license-manager`** (Postgres + Auth + RLS). Business rules live in Postgres functions; migrations are numbered SQL files.
+  - Authentication is shared: same Google OAuth client, same `profiles` / `linked_accounts` tables, same sign-in flow. This app only adds its own Site URL and redirect URL to the project's allowed list.
+  - Contract tables are prefixed `contract_` (e.g., `contract_audit_log`) because `audit_log`, `email_log`, `is_admin()` and several enums already belong to the license manager. Contract migrations live in their own folder and never alter license-manager tables or types.
+  - Because the database is shared, an RLS mistake in one app can expose the other's data. RLS policies for contract tables are tested before release.
 - Documents: S3 with versioning and Object Lock (to my knowledge Supabase Storage has neither, so it is not used for originals). The database stores each document's S3 key, version ID, and SHA-256 hash.
 - Reminders: a daily `pg_cron` job calls an Edge Function protected by a `CRON_SECRET` (kept in Supabase Vault), which sends through the `send-email` function (Resend).
-- Edge Functions deploy through GitHub Actions.
+- Edge Functions deploy through GitHub Actions. `send-email` currently belongs to `license-manager` (sender `license_manager@em.sil.org`); this repo must not redeploy a competing copy (see §11 #12).
 
 Notes:
 - Object storage must support **versioning and object lock/WORM** to enforce R-D2.
@@ -213,6 +216,7 @@ Notes:
 8. **Counterparty list:** is there an existing vendor/partner master list to sync with?
 9. **Are MOUs reviewed for binding status by legal,** or should the app just record the drafted position?
 10. **Repo name:** currently `contract-repository-` (trailing hyphen); rename to `contract-repository` (pending).
+12. **Shared project housekeeping.** (a) Roles: the license manager's `user_role` enum (`member`/`admin`) is shared. Proposed: a separate `contract_roles` table keyed to `profiles(id)`, so license-manager admins get no contract access by default and the license manager's enum is untouched. (b) `send-email`: generalize the existing function (sender name/address per app) rather than deploying a second copy. (c) Shared `cron_secret` in Vault is reused.
 11. **Object Lock mode:** start in governance mode; switch to compliance only after retention periods are confirmed (irreversible).
 
 ---
