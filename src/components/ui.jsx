@@ -1,0 +1,64 @@
+import AppLayout from './AppLayout'
+import { getLinks } from '../navLinks'
+import { STATUS_LABELS } from '../lib/format'
+
+export const APP_NAME = 'Contract Repository'
+
+export function Page({ title, actions, children, wide }) {
+  return (
+    <AppLayout appName={APP_NAME} links={getLinks()}>
+      <div className={`p-4 pt-14 md:pt-8 md:p-8 mx-auto ${wide ? 'max-w-7xl' : 'max-w-5xl'}`}>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+          <h1 className="font-display text-2xl font-bold text-brand">{title}</h1>
+          <div className="flex gap-2">{actions}</div>
+        </div>
+        {children}
+      </div>
+    </AppLayout>
+  )
+}
+
+export function Card({ title, children, actions, id }) {
+  return (
+    <section id={id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-5">
+      {(title || actions) && (
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-semibold text-gray-800">{title}</h2>
+          <div className="flex gap-2">{actions}</div>
+        </div>
+      )}
+      {children}
+    </section>
+  )
+}
+
+const STATUS_STYLE = {
+  draft: 'bg-gray-100 text-gray-700', active: 'bg-green-100 text-green-800', expired: 'bg-amber-100 text-amber-800',
+  terminated: 'bg-red-100 text-red-800', superseded: 'bg-purple-100 text-purple-800', completed: 'bg-blue-100 text-blue-800',
+}
+export function StatusBadge({ status }) {
+  return <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLE[status] || STATUS_STYLE.draft}`}>{STATUS_LABELS[status] || status}</span>
+}
+
+export const btnPrimary = 'inline-flex items-center gap-1.5 bg-brand hover:bg-brand-dark text-white text-sm font-semibold rounded-lg px-4 py-2 disabled:opacity-50'
+export const btnSecondary = 'inline-flex items-center gap-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg px-4 py-2 disabled:opacity-50'
+export const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand'
+
+export function Field({ label, hint, required, children, className = '' }) {
+  return (
+    <label className={`block ${className}`}>
+      <span className="block text-xs font-semibold text-gray-600 mb-1">{label}{required && <span className="text-red-500"> *</span>}</span>
+      {children}
+      {hint && <span className="block text-xs text-gray-400 mt-1">{hint}</span>}
+    </label>
+  )
+}
+
+export function ErrorMsg({ error }) {
+  if (!error) return null
+  return <div role="alert" className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 mb-3">{error.message || String(error)}</div>
+}
+
+export function Loading({ what = 'Loading' }) {
+  return <p className="text-gray-400 text-sm py-6">{what}…</p>
+}
