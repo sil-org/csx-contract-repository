@@ -1,0 +1,11 @@
+{
+  "CORSRules": [
+    {
+      "AllowedOrigins": ["https://contracts.example.org"],
+      "AllowedMethods": ["PUT"],
+      "AllowedHeaders": ["content-type", "x-amz-checksum-sha256"],
+      "ExposeHeaders": ["ETag", "x-amz-version-id"],
+      "MaxAgeSeconds": 3000
+    }
+  ]
+}

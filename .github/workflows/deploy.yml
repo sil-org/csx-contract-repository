@@ -1,0 +1,29 @@
+name: Deploy Edge Functions
+
+# Frontend build + deploy is handled by AWS Amplify Hosting (connected to this
+# repo, uses amplify.yml). This workflow only deploys this app's Edge Functions
+# to the SHARED Supabase project.
+#
+# Functions are listed by name on purpose. Plain `supabase functions deploy`
+# deploys everything in supabase/functions/, and this project is shared with
+# license-manager, whose `send-email` function must never be overwritten from here.
+
+on:
+  push:
+    branches: [main]
+    paths: ['supabase/functions/**', '.github/workflows/deploy.yml']
+
+jobs:
+  deploy-edge-functions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy contract Edge Functions
+        run: supabase functions deploy contract-documents contract-reminders --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
