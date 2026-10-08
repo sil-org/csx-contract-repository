@@ -103,7 +103,7 @@ export default function ContractForm() {
               <input className={inputCls} list="counterparties" required value={form.counterparty} onChange={e => set('counterparty', e.target.value)} />
               <datalist id="counterparties">{ref.counterparties.map(c => <option key={c.id} value={c.name} />)}</datalist>
             </Field>
-            <Field label="Internal owner" required hint="Accountable person; receives this contract's reminders.">
+            <Field label="Internal owner" required hint="Accountable person; receives this contract's reminders. Not listed? An admin adds them under Users & roles first.">
               <select className={inputCls} required value={form.owner_id} onChange={e => set('owner_id', e.target.value)}>
                 <option value="">Select…</option>{people}
               </select>

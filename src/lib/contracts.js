@@ -104,8 +104,13 @@ export async function listAudit({ contractId, limit = 200 } = {}) {
 }
 
 // ── admin ────────────────────────────────────────────────────────────────────
+// People who currently HAVE a contract role (a short list; everyone else is found via searchProfiles).
 export async function listAdminUsers() {
   return unwrap(await supabase.rpc('contract_admin_users'))
+}
+// People WITHOUT a contract role matching `query` (name or email); admin only, capped server-side.
+export async function searchProfiles(query) {
+  return unwrap(await supabase.rpc('contract_search_profiles', { p_query: query, p_limit: 25 }))
 }
 export async function setUserRole(profileId, role, grantedBy) {
   if (!role) return unwrap(await supabase.from('contract_roles').delete().eq('profile_id', profileId))

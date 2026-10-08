@@ -18,8 +18,10 @@ $PSQL -d postgres -c "create database t"
 export PGOPTIONS="-c client_min_messages=warning"
 $PSQL -d t -f "$HERE/00_stubs.sql"
 $PSQL -d t -f "$KERNEL"
-$PSQL -d t -f "$HERE/../contracts/01_contracts_schema.sql"
-$PSQL -d t -f "$HERE/../contracts/01_contracts_schema.sql"   # idempotent re-run
+for m in 01_contracts_schema 03_user_search; do   # 02 needs pg_cron/Vault, which only exist on Supabase
+  $PSQL -d t -f "$HERE/../contracts/$m.sql"
+  $PSQL -d t -f "$HERE/../contracts/$m.sql"          # idempotent re-run
+done
 for f in "$HERE"/[1-9]*_test.sql; do
   echo "== $(basename "$f")"
   PGOPTIONS="-c client_min_messages=notice" $PSQL -d t -f "$f" 2>&1 \
