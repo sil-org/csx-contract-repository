@@ -216,7 +216,7 @@ Notes:
 8. **Counterparty list:** is there an existing vendor/partner master list to sync with?
 9. **Are MOUs reviewed for binding status by legal,** or should the app just record the drafted position?
 10. **Repo name:** currently `contract-repository-` (trailing hyphen); rename to `contract-repository` (pending).
-12. **Shared project housekeeping.** (a) Roles: the license manager's `user_role` enum (`member`/`admin`) is shared. Proposed: a separate `contract_roles` table keyed to `profiles(id)`, so license-manager admins get no contract access by default and the license manager's enum is untouched. (b) `send-email`: generalize the existing function (sender name/address per app) rather than deploying a second copy. (c) Shared `cron_secret` in Vault is reused.
+12. **Shared project housekeeping.** (a) **Decided:** contract roles are separate from the license manager's. A `contract_roles` table keyed to `profiles(id)` holds Viewer / Contributor / Auditor / Admin; license-manager admins get no contract access unless granted, and the shared `user_role` enum is untouched. The first contract Admin is seeded by SQL, like the license manager's first admin. (b) `send-email`: generalize the existing function (sender name/address per app) rather than deploying a second copy. (c) Shared `cron_secret` in Vault is reused.
 11. **Object Lock mode:** start in governance mode; switch to compliance only after retention periods are confirmed (irreversible).
 
 ---
