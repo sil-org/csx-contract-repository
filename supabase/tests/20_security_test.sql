@@ -300,8 +300,47 @@ select contract_log_access(:'P_vic', current_setting('t.std')::uuid, null, 'down
 select t_eq('downloads are logged', (select count(*)::int from contract_audit_log where action = 'download'), 1);
 
 -- ── roles + last-admin guard ─────────────────────────────────────────────────
-select t_eq('admin can list users for role assignment', t_count(:'admin', 'select * from contract_admin_users()'), 7);
+select t_eq('admin lists only people who have a role (not everyone)', t_count(:'admin', 'select * from contract_admin_users()'), 5);
+select t_eq('  ...and the license-manager admin / no-role people are not in it',
+  t_count(:'admin', $q$select * from contract_admin_users() where primary_email in ('lou@sil.org', 'nora@sil.org')$q$), 0);
 select t_eq('non-admin gets an empty user list', t_count(:'cora', 'select * from contract_admin_users()'), 0);
+
+-- ── people search (03_user_search.sql) ───────────────────────────────────────
+-- 100 extra profiles so the old "load everyone" approach would have lost people,
+-- plus an underscore address and a look-alike to prove LIKE wildcards are escaped.
+insert into profiles (display_name, primary_email)
+select 'Bulk Person ' || lpad(g::text, 3, '0'), 'bulk' || lpad(g::text, 3, '0') || '@sil.org' from generate_series(1, 100) g;
+insert into profiles (display_name, primary_email) values
+  ('Scott Kohler',  'scott_kohler@sil.org'),
+  ('Scott Xkohler', 'scottXkohler@sil.org'),
+  ('Zed Nobody',    'zed@sil.org');
+select t_eq('search finds the one person among 100+ others', t_count(:'admin', $q$select * from contract_search_profiles('scott_kohler')$q$), 1);
+select t_eq('"_" does not match the look-alike address',
+  t_count(:'admin', $q$select * from contract_search_profiles('scott_kohler') where primary_email like 'scottX%'$q$), 0);
+select t_eq('search matches by name', t_count(:'admin', $q$select * from contract_search_profiles('Scott Kohler')$q$), 1);
+select t_eq('search is case-insensitive', t_count(:'admin', $q$select * from contract_search_profiles('SCOTT_KOHLER@SIL')$q$), 1);
+select t_eq('"%" is a literal, not match-everything', t_count(:'admin', $q$select * from contract_search_profiles('%%')$q$), 0);
+select t_eq('queries under 2 characters return nothing', t_count(:'admin', $q$select * from contract_search_profiles('s')$q$), 0);
+select t_eq('blank query returns nothing', t_count(:'admin', $q$select * from contract_search_profiles('   ')$q$), 0);
+select t_eq('results are capped (default 25)', t_count(:'admin', $q$select * from contract_search_profiles('bulk')$q$), 25);
+select t_eq('results are capped (max 50, however much is asked for)', t_count(:'admin', $q$select * from contract_search_profiles('bulk', 1000)$q$), 50);
+select t_eq('people who already have a role are not offered again', t_count(:'admin', $q$select * from contract_search_profiles('cora')$q$), 0);
+select t_eq('people without a role are found (no-role user)', t_count(:'admin', $q$select * from contract_search_profiles('nora@sil')$q$), 1);
+select t_eq('contributor cannot search people', t_count(:'cora', $q$select * from contract_search_profiles('scott')$q$), 0);
+select t_eq('license-manager admin cannot search people', t_count(:'lou', $q$select * from contract_search_profiles('scott')$q$), 0);
+select t_eq('no-role user cannot search people', t_count(:'nora', $q$select * from contract_search_profiles('scott')$q$), 0);
+
+-- ── directory only carries people the app needs by name ──────────────────────
+select t_eq('directory excludes unrelated profiles (not 100+ staff)', t_count(:'cora', 'select * from contract_directory()'), 5);
+select t_eq('  ...and an unrelated person is absent', t_count(:'cora', $q$select * from contract_directory() where primary_email = 'zed@sil.org'$q$), 0);
+select t_eq('  ...bulk staff are absent', t_count(:'cora', $q$select * from contract_directory() where primary_email like 'bulk%'$q$), 0);
+select t_eq('role-holders are in the directory', t_count(:'cora', $q$select * from contract_directory() where primary_email = 'aud@sil.org'$q$), 1);
+insert into contracts (title, type_id, counterparty_id, owner_id, department)
+select 'Owned by a person with no role', (select id from contract_types limit 1), '00000000-0000-0000-0000-0000000000c1',
+       '00000000-0000-0000-0000-0000000000a6', 'Ops';
+select t_eq('an owner without a role still resolves to a name', t_count(:'cora', $q$select * from contract_directory() where primary_email = 'nora@sil.org'$q$), 1);
+select t_eq('no-role user still gets an empty directory', t_count(:'nora', 'select * from contract_directory()'), 0);
+select t_eq('directory empty for license-manager admin', t_count(:'lou', 'select * from contract_directory()'), 0);
 select t_denied('cannot demote the last admin', :'admin',
   $q$update contract_roles set role = 'viewer' where profile_id = '00000000-0000-0000-0000-0000000000a1'$q$, 'last contract admin');
 select t_denied('cannot delete the last admin', :'admin',

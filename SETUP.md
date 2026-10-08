@@ -9,6 +9,9 @@ most of the usual "new app" setup is already done. Do these in order.
    [`supabase/contracts/01_contracts_schema.sql`](supabase/contracts/01_contracts_schema.sql).
    It requires license-manager's auth kernel (`profiles`, `linked_accounts`, `current_profile_id()`),
    which is already there. It only creates `contract_`-prefixed objects and is safe to re-run.
+   Then run [`supabase/contracts/03_user_search.sql`](supabase/contracts/03_user_search.sql) the same way. It makes
+   the Users page list only people who have a role and adds a search for adding someone (the shared project
+   has thousands of profiles, so they are never all loaded at once). Re-running either file is safe.
 2. **Allow this app's URLs.** Authentication → URL Configuration → add to **Redirect URLs**:
    `https://YOUR_DOMAIN/auth/callback` and `http://localhost:5173/auth/callback`.
    Leave **Site URL** alone — it belongs to license-manager.
@@ -19,7 +22,8 @@ most of the usual "new app" setup is already done. Do these in order.
    insert into contract_roles (profile_id, role)
    select id, 'admin' from profiles where primary_email = 'your-email@sil.org';
    ```
-   Everyone else is assigned a role from **Admin → Users & roles**. License-manager admins get
+   Everyone else is assigned a role from **Admin → Users & roles**: search for the person under *Add a person*
+   (they appear once they have signed in to any SIL app or been imported into the license manager) and pick a role. License-manager admins get
    **no** contract access automatically.
 
 ## 2. S3 bucket for the documents
