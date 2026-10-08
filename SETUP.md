@@ -11,7 +11,10 @@ most of the usual "new app" setup is already done. Do these in order.
    which is already there. It only creates `contract_`-prefixed objects and is safe to re-run.
    Then run [`supabase/contracts/03_user_search.sql`](supabase/contracts/03_user_search.sql) the same way. It makes
    the Users page list only people who have a role and adds a search for adding someone (the shared project
-   has thousands of profiles, so they are never all loaded at once). Re-running either file is safe.
+   has thousands of profiles, so they are never all loaded at once).
+   Then run [`supabase/contracts/04_sheet_fields.sql`](supabase/contracts/04_sheet_fields.sql), which adds the fields
+   needed to hold everything in the existing Software Subscriptions tracking sheet (the header of that file maps every
+   sheet column to its field). Run 04 **before** the app update that uses it goes live. Re-running any of them is safe.
 2. **Allow this app's URLs.** Authentication → URL Configuration → add to **Redirect URLs**:
    `https://YOUR_DOMAIN/auth/callback` and `http://localhost:5173/auth/callback`.
    Leave **Site URL** alone — it belongs to license-manager.
