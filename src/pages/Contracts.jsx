@@ -30,7 +30,7 @@ export default function Contracts() {
     const out = (state.contracts || []).filter(c =>
       (!f.status || c.status === f.status) && (!f.type || c.type_id === f.type) &&
       (!f.owner || c.owner_id === f.owner) && (!f.dept || c.department === f.dept) &&
-      (!q || [c.title, c.counterparty?.name, c.notes, c.department, ...(c.tags || [])].some(v => v?.toLowerCase().includes(q))))
+      (!q || [c.title, c.system_name, c.counterparty?.name, c.notes, c.department, c.department_manager, c.administrators, ...(c.tags || [])].some(v => v?.toLowerCase().includes(q))))
     const val = c => ({ title: c.title, counterparty: c.counterparty?.name, type: c.type?.name, status: c.status, owner: ownerName(c.owner_id),
       notice: c.notice_deadline || '9999', expires: c.expiration_date || '9999' }[sort.key] ?? '')
     return out.sort((a, b) => String(val(a)).localeCompare(String(val(b))) * sort.dir)
@@ -72,6 +72,7 @@ export default function Contracts() {
               {rows.map(c => (
                 <tr key={c.id} className="hover:bg-gray-50">
                   <td className="px-3 py-2"><Link to={`/contracts/${c.id}`} className="font-medium text-brand hover:underline">{c.title}</Link>
+                    {c.system_name && c.system_name !== c.title && <div className="text-xs text-gray-400">{c.system_name}</div>}
                     {c.sensitivity === 'restricted' && <span className="ml-2 text-[11px] font-semibold text-red-700 bg-red-50 rounded px-1.5 py-0.5">Restricted</span>}</td>
                   <td className="px-3 py-2">{c.counterparty?.name}</td>
                   <td className="px-3 py-2">{c.type?.name}</td>

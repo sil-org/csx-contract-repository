@@ -4,6 +4,7 @@ import { getContract, listTypes, listCounterparties, getDirectory, listContracts
 import { STATUS_LABELS, BINDING_LABELS, RENEWAL_LABELS, PROVISIONS } from '../lib/format'
 import { Page, Card, Field, ErrorMsg, Loading, btnPrimary, btnSecondary, inputCls } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
+import { ConfidentialNote } from '../components/ui'
 
 const EMPTY = {
   title: '', type_id: '', counterparty: '', owner_id: '', backup_owner_id: '', department: '',
@@ -12,9 +13,16 @@ const EMPTY = {
   renewal_type: 'none', renewal_term: '', notice_period_days: 0, termination_for_convenience: '', termination_notice_days: '',
   value_amount: '', currency: 'USD', payment_terms: '', billing_frequency: '', budget_code: '',
   parent_id: '', amends_id: '', superseded_by_id: '', reminders_enabled: true, details: {}, provisions: {},
+  // Fields from the existing tracking sheet
+  system_name: '', department_manager: '', annual_amount: '', annual_amount_note: '', mission_justification: '',
+  initial_contract_date: '', initial_signer: '', last_renewal_date: '', notice_terms: '', administrators: '',
+  corporate_license: '', google_sso: '', pricing_info: '', vendor_contact_note: '',
 }
 
-const nz = v => (v === '' || v === undefined ? null : v)
+const nz = v => (v === '' || v === undefined ? null : (typeof v === 'string' ? (v.trim() === '' ? null : v.trim()) : v))
+// yes / no / unknown <-> true / false / null (kept as '' | 'true' | 'false' in the form)
+const triIn = v => (v == null ? '' : String(v))
+const triOut = v => (v === '' ? null : v === 'true')
 
 export default function ContractForm() {
   const { id } = useParams()
@@ -34,7 +42,8 @@ export default function ContractForm() {
           if (!existing) throw new Error('Contract not found, or you do not have access to it.')
           setForm({ ...EMPTY, ...Object.fromEntries(Object.entries(existing).map(([k, v]) => [k, v ?? EMPTY[k] ?? ''])),
             counterparty: existing.counterparty?.name || '', tags: (existing.tags || []).join(', '),
-            termination_for_convenience: existing.termination_for_convenience == null ? '' : String(existing.termination_for_convenience) })
+            termination_for_convenience: triIn(existing.termination_for_convenience),
+            corporate_license: triIn(existing.corporate_license), google_sso: triIn(existing.google_sso) })
         } else {
           const first = types.find(t => t.form_kind === 'vendor') || types[0]
           setForm(f => ({ ...f, type_id: first?.id || '' }))
@@ -70,6 +79,12 @@ export default function ContractForm() {
         payment_terms: nz(form.payment_terms), billing_frequency: nz(form.billing_frequency), budget_code: nz(form.budget_code),
         parent_id: nz(form.parent_id), amends_id: nz(form.amends_id), superseded_by_id: nz(form.superseded_by_id),
         reminders_enabled: form.reminders_enabled, details: form.details, provisions: form.provisions,
+        system_name: nz(form.system_name), department_manager: nz(form.department_manager),
+        annual_amount: nz(form.annual_amount) === null ? null : Number(form.annual_amount), annual_amount_note: nz(form.annual_amount_note),
+        mission_justification: nz(form.mission_justification), initial_contract_date: nz(form.initial_contract_date),
+        initial_signer: nz(form.initial_signer), last_renewal_date: nz(form.last_renewal_date), notice_terms: nz(form.notice_terms),
+        administrators: nz(form.administrators), corporate_license: triOut(form.corporate_license), google_sso: triOut(form.google_sso),
+        pricing_info: nz(form.pricing_info), vendor_contact_note: nz(form.vendor_contact_note),
         ...(id ? { status: form.status } : {}),
       }
       const saved = await saveContract(id, fields)
@@ -94,6 +109,8 @@ export default function ContractForm() {
         <Card title="Basics">
           <div className="grid md:grid-cols-2 gap-4">
             <Field label="Title" required className="md:col-span-2">{text('title', { required: true })}</Field>
+            <Field label="System / product" hint="e.g. Zoom, Freshworks CRM — the thing the contract is for.">{text('system_name')}</Field>
+            <Field label="Department manager">{text('department_manager')}</Field>
             <Field label="Contract type" required>
               <select className={inputCls} required value={form.type_id} onChange={e => set('type_id', e.target.value)}>
                 {ref.types.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -137,9 +154,12 @@ export default function ContractForm() {
 
         <Card title="Dates and renewal">
           <div className="grid md:grid-cols-3 gap-4">
-            <Field label="Signed date">{text('signed_date', { type: 'date' })}</Field>
+            <Field label="Initial contract date" hint="When the very first agreement was made.">{text('initial_contract_date', { type: 'date' })}</Field>
+            <Field label="Initial contract signer">{text('initial_signer')}</Field>
+            <Field label="Last renewal date">{text('last_renewal_date', { type: 'date' })}</Field>
+            <Field label="Signed date (current term)">{text('signed_date', { type: 'date' })}</Field>
             <Field label="Effective date">{text('effective_date', { type: 'date' })}</Field>
-            <Field label="Expiration / end date" hint={form.evergreen ? 'Ignored while evergreen.' : undefined}>{text('expiration_date', { type: 'date', disabled: form.evergreen })}</Field>
+            <Field label="Expiration / next renewal date" hint={form.evergreen ? 'Ignored while evergreen.' : 'The date the current term ends or renews.'}>{text('expiration_date', { type: 'date', disabled: form.evergreen })}</Field>
             <label className="flex items-center gap-2 text-sm md:col-span-3">
               <input type="checkbox" checked={form.evergreen} onChange={e => set('evergreen', e.target.checked)} /> Evergreen (no fixed end date)
             </label>
@@ -152,6 +172,7 @@ export default function ContractForm() {
             <Field label="Notice period (days)" hint="Days before expiry that notice of non-renewal/termination is due. Reminders count down to this deadline, not the expiry.">
               {text('notice_period_days', { type: 'number', min: 0 })}
             </Field>
+            <Field label="Renewal notice terms (as written)" hint="e.g. “60 days written notice”. The number of days above drives the reminders.">{text('notice_terms')}</Field>
             <Field label="Termination for convenience?">
               <select className={inputCls} value={form.termination_for_convenience} onChange={e => set('termination_for_convenience', e.target.value)}>
                 <option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option>
@@ -164,14 +185,38 @@ export default function ContractForm() {
           </div>
         </Card>
 
-        {(kind === 'vendor' || kind === 'sow') && (
+        {(kind === 'vendor' || kind === 'sow' || kind === 'other') && (
           <Card title="Financial">
+            <ConfidentialNote />
             <div className="grid md:grid-cols-3 gap-4">
-              <Field label="Contract value">{text('value_amount', { type: 'number', step: '0.01', min: 0 })}</Field>
+              <Field label="Annual amount (vendor license only)">{text('annual_amount', { type: 'number', step: '0.01', min: 0 })}</Field>
+              <Field label="Annual amount: notes" hint="Anything that doesn't fit a number — fees, “internal”, “free?”, “donated”." className="md:col-span-2">{text('annual_amount_note')}</Field>
+              <Field label="Total contract value">{text('value_amount', { type: 'number', step: '0.01', min: 0 })}</Field>
               <Field label="Currency">{text('currency', { maxLength: 3 })}</Field>
               <Field label="Billing frequency">{text('billing_frequency')}</Field>
               <Field label="Payment terms">{text('payment_terms')}</Field>
               <Field label="Budget code / cost center">{text('budget_code')}</Field>
+            </div>
+          </Card>
+        )}
+
+        {(kind === 'vendor' || kind === 'other') && (
+          <Card title="System and subscription details">
+            <div className="grid md:grid-cols-2 gap-4">
+              <Field label="Why this software advances our mission" hint="One paragraph." className="md:col-span-2">
+                <textarea className={inputCls} rows={4} value={form.mission_justification} onChange={e => set('mission_justification', e.target.value)} />
+              </Field>
+              <Field label="Administrator(s)" hint="Names or email addresses.">{text('administrators')}</Field>
+              <Field label="More information / pricing">{text('pricing_info')}</Field>
+              <Field label="Corporate (organization-wide) license?">
+                <select className={inputCls} value={form.corporate_license} onChange={e => set('corporate_license', e.target.value)}>
+                  <option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option></select>
+              </Field>
+              <Field label="Uses Google sign-in?">
+                <select className={inputCls} value={form.google_sso} onChange={e => set('google_sso', e.target.value)}>
+                  <option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option></select>
+              </Field>
+              <Field label="Vendor contact rule" hint="e.g. “Do not contact the vendor without speaking to the department manager.”" className="md:col-span-2">{text('vendor_contact_note')}</Field>
             </div>
           </Card>
         )}

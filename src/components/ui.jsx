@@ -62,3 +62,12 @@ export function ErrorMsg({ error }) {
 export function Loading({ what = 'Loading' }) {
   return <p className="text-gray-400 text-sm py-6">{what}…</p>
 }
+
+// Annual amounts were negotiated with vendors under confidentiality agreements.
+export function ConfidentialNote() {
+  return (
+    <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+      <strong>Confidential.</strong> Amounts here were negotiated under confidentiality agreements — not to be shared with vendors or outside SIL.
+    </p>
+  )
+}
