@@ -1,6 +1,6 @@
 # Contract Repository — Requirements Specification
 
-**Status:** Draft v0.1 · 2026-10-07
+**Status:** Draft v0.2 · 2026-10-08
 **Owner:** Kate Brenner
 **Purpose:** A GitHub-hosted, IDP-authenticated repository of record for organizational agreements (MOUs, SOWs, vendor contracts), with preserved original copies and deadline reminders.
 
@@ -43,7 +43,7 @@
 
 Requirements:
 - **R-U1** Every contract has exactly one named internal owner and an optional backup owner. Reminders cannot be enabled on a contract with no owner.
-- **R-U2** Roles are derived from IDP group membership (see §7), not managed by hand in the app.
+- **R-U2** Roles are assigned by Admins in an in-app Admin → Users screen (as in the license manager). Everyone who signs in with an organization account starts with no contract access until an Admin assigns a role.
 - **R-U3** Per-contract restriction: a contract can be marked *Restricted* so only the owner, named users, and Admins/Auditors can see it (HR, legal, or sensitive vendor matters).
 
 ---
@@ -59,8 +59,8 @@ This is the section the "people move or delete things" concern drives.
 - **R-D5 Link health check.** Periodically verify that external links still resolve; flag broken or access-denied links to the owner. (This catches moved/deleted Drive files.)
 - **R-D6 Supporting documents.** Allow multiple attachments per contract with a document role: Original (executed), Amendment, Exhibit/Schedule, Correspondence, Other.
 - **R-D7 Versioning.** Keep full version history per document; show who uploaded each, when, and why (required change note).
-- **R-D8 Accepted formats.** PDF required for executed originals; also allow DOCX, XLSX, images. Size limit to be set (suggest 50 MB/file). Virus scanning on upload.
-- **R-D9 Storage backend.** Binary files must **not** be committed to the Git repository (Git is a poor fit for large binaries and cannot enforce immutability or access control). Use object storage with versioning/object-lock (see §8).
+- **R-D8 Accepted formats.** PDF required for executed originals; also allow DOCX, XLSX, images. Size limit to be set (suggest 50 MB/file). Virus scanning on upload (Phase 2; e.g., GuardDuty Malware Protection for S3).
+- **R-D9 Storage backend.** Binary files must **not** be committed to the Git repository (Git is a poor fit for large binaries and cannot enforce immutability or access control). Originals are stored in a private **Amazon S3** bucket with public access blocked, encryption on, **versioning and Object Lock** enabled (see §8). Object Lock starts in *governance* mode; moving to *compliance* mode waits on confirmed retention periods (§11).
 - **R-D10 Backup and restore.** Automated backups of both database and files, with a documented, tested restore.
 
 ---
@@ -146,11 +146,11 @@ Yes/No flags: confidentiality, auto-renewal, assignment consent, indemnification
 
 ## 7. Authentication and access
 
-- **R-A1 Sign-in only via the organization's IDP** (SSO via OIDC or SAML). No local passwords.
-- **R-A2** Role mapping from IDP groups (§2). Deprovisioning in the IDP removes access automatically.
+- **R-A1 Sign-in only via the organization's IDP.** Google Workspace SSO through Supabase Auth, restricted to organization (sil.org) accounts using an Internal OAuth consent screen, as in `sil-app-template`/`license-manager`. No local passwords.
+- **R-A2** Deprovisioning a person in Google Workspace blocks their sign-in automatically; Admins also deactivate their profile and reassign any contracts they own.
 - **R-A3** Session timeout and MFA enforced by the IDP policy.
-- **R-A4** File downloads use short-lived signed URLs, never public links.
-- **R-A5** Least privilege: default for a new user is no access until in a mapped group.
+- **R-A4** File downloads use short-lived signed URLs issued by an Edge Function after an access check, never public links. The function's AWS credentials allow upload and read only, with no delete.
+- **R-A5** Least privilege: a new user has no access to contracts until an Admin assigns a role.
 
 ---
 
@@ -164,8 +164,14 @@ Yes/No flags: confidentiality, auto-renewal, assignment consent, indemnification
 | **B. Contracts as files in a private GitHub repo** | Metadata as YAML/JSON beside PDFs; Actions send reminders | Simple, free, full history | No per-contract access control, large binaries, deletable by anyone with write access, history can be rewritten — conflicts with R-D2/R-U3 |
 | **C. Buy an off-the-shelf repository** | e.g., a lightweight CLM | Fastest | Cost; outside "build it ourselves" intent |
 
+**Decision (2026-10-08): Option A**, built on `sil-app-template` (the same stack as `license-manager`):
+- Frontend: React + Vite + Tailwind on AWS Amplify Hosting, connected to this repo (builds on push to `main`).
+- Backend: Supabase (Postgres + Auth + RLS). Business rules live in Postgres functions; migrations are numbered SQL files.
+- Documents: S3 with versioning and Object Lock (to my knowledge Supabase Storage has neither, so it is not used for originals). The database stores each document's S3 key, version ID, and SHA-256 hash.
+- Reminders: a daily `pg_cron` job calls an Edge Function protected by a `CRON_SECRET` (kept in Supabase Vault), which sends through the `send-email` function (Resend).
+- Edge Functions deploy through GitHub Actions.
+
 Notes:
-- A separate existing app (`btc-abstracts`) uses Vite, Tailwind, Supabase, and Google OAuth. If the IDP is Google, that stack could be reused for Option A.
 - Object storage must support **versioning and object lock/WORM** to enforce R-D2.
 - Secrets and credentials are never committed; use GitHub/host secrets.
 
@@ -197,16 +203,17 @@ Notes:
 
 ## 11. Open questions
 
-1. **Which IDP?** (Microsoft Entra, Okta, Google Workspace, other) — determines OIDC/SAML setup and group mapping.
-2. **Hosting preference:** Option A, B, or C in §8? Any required cloud provider or data-residency constraint?
+1. ~~**Which IDP?**~~ **Resolved:** Google Workspace SSO via Supabase Auth, as in `license-manager`.
+2. ~~**Hosting preference**~~ **Resolved:** Option A on Amplify + Supabase, with S3 for documents (§8). Data-residency constraints, if any, still to confirm.
 3. **Who are the users and roughly how many contracts exist today?** (Sizes migration and search needs.)
-4. **Who is the escalation contact** for missed decisions?
-5. **Reminder channels:** email only, or Slack/Teams/calendar too?
+4. **Escalation contact** for missed decisions. Proposed: the contract's backup owner, with an Admin-configured fallback address for contracts without one. Not blocking.
+5. **Reminder channels:** email only for the MVP (agreed); Slack/Teams/calendar in Phase 2 if wanted.
 6. **Retention periods and legal-hold process:** does the organization already have a records retention policy to adopt?
 7. **Sensitivity:** do any contracts contain personal data or require restricted visibility by default?
 8. **Counterparty list:** is there an existing vendor/partner master list to sync with?
 9. **Are MOUs reviewed for binding status by legal,** or should the app just record the drafted position?
-10. **Repo name:** currently `contract-repository-` (trailing hyphen); rename to `contract-repository`.
+10. **Repo name:** currently `contract-repository-` (trailing hyphen); rename to `contract-repository` (pending).
+11. **Object Lock mode:** start in governance mode; switch to compliance only after retention periods are confirmed (irreversible).
 
 ---
 
