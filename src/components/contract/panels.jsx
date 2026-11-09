@@ -156,15 +156,17 @@ export function DecisionPanel({ contract, canEdit, directory, profileId, autoOpe
 }
 
 // ── Milestones ───────────────────────────────────────────────────────────────
-export function MilestonesPanel({ contract, canEdit }) {
+export function MilestonesPanel({ contract, canEdit, onVisible }) {
   const [{ data: items, error }, reload] = useLoad(() => listMilestones(contract.id), [contract.id])
   const [form, setForm] = useState({ due: '', desc: '' })
   const [err, setErr] = useState(null)
   const act = fn => async (...a) => { setErr(null); try { await fn(...a); reload() } catch (x) { setErr(x) } }
 
-  if (!canEdit && !items?.length) return null
+  const visible = canEdit || !!items?.length
+  useEffect(() => { onVisible?.(visible) }, [visible]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (!visible) return null
   return (
-    <Card title="Milestones and dated obligations">
+    <Card title="Milestones and dated obligations" id="milestones">
       <ErrorMsg error={error || err} />
       <ul className="divide-y divide-gray-100 mb-2">
         {items?.map(m => (
@@ -189,13 +191,15 @@ export function MilestonesPanel({ contract, canEdit }) {
 }
 
 // ── External links (working copies) ──────────────────────────────────────────
-export function LinksPanel({ contract, canEdit, profileId }) {
+export function LinksPanel({ contract, canEdit, profileId, onVisible }) {
   const [{ data: links, error }, reload] = useLoad(() => listLinks(contract.id), [contract.id])
   const [form, setForm] = useState({ url: '', label: 'Working copy' })
   const [err, setErr] = useState(null)
-  if (!canEdit && !links?.length) return null
+  const visible = canEdit || !!links?.length
+  useEffect(() => { onVisible?.(visible) }, [visible]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (!visible) return null
   return (
-    <Card title="Working-copy links">
+    <Card title="Working-copy links" id="links">
       <ErrorMsg error={error || err} />
       <p className="text-xs text-gray-500 mb-2">Convenience links (e.g. Google Drive). They can break if someone moves or deletes the file — the stored original above is the authoritative copy.</p>
       <ul className="divide-y divide-gray-100 mb-2">
@@ -230,7 +234,7 @@ export function AccessPanel({ contract, canEdit, directory, profileId }) {
   if (contract.sensitivity !== 'restricted') return null
   const act = fn => async () => { setErr(null); try { await fn(); reload() } catch (x) { setErr(x) } }
   return (
-    <Card title="Who can see this restricted contract">
+    <Card title="Who can see this restricted contract" id="access">
       <ErrorMsg error={error || err} />
       <p className="text-xs text-gray-500 mb-2">Always: the owner, backup owner, admins and auditors. Plus the people named here.</p>
       <ul className="mb-2 text-sm">
@@ -252,7 +256,7 @@ export function AccessPanel({ contract, canEdit, directory, profileId }) {
 }
 
 // ── Relationships ────────────────────────────────────────────────────────────
-export function RelationshipsPanel({ contract, allContracts }) {
+export function RelationshipsPanel({ contract, allContracts, onVisible }) {
   const [{ data: related }] = useLoad(() => listRelated(contract.id), [contract.id])
   const byId = id => allContracts.find(c => c.id === id)
   const parent = contract.parent_id && byId(contract.parent_id)
@@ -260,10 +264,12 @@ export function RelationshipsPanel({ contract, allContracts }) {
   const supers = contract.superseded_by_id && byId(contract.superseded_by_id)
   const children = (related || []).filter(r => r.parent_id === contract.id)
   const amendments = (related || []).filter(r => r.amends_id === contract.id)
-  if (!parent && !amends && !supers && !children.length && !amendments.length) return null
+  const visible = !!(parent || amends || supers || children.length || amendments.length)
+  useEffect(() => { onVisible?.(visible) }, [visible]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (!visible) return null
   const L = c => <Link className="text-brand hover:underline" to={`/contracts/${c.id}`}>{c.title}</Link>
   return (
-    <Card title="Related contracts">
+    <Card title="Related contracts" id="relationships">
       <ul className="text-sm space-y-1">
         {parent && <li>Parent agreement: {L(parent)}</li>}
         {amends && <li>Amends: {L(amends)}</li>}
@@ -279,7 +285,7 @@ export function RelationshipsPanel({ contract, allContracts }) {
 export function HistoryPanel({ contract, directory }) {
   const [{ data: rows, error }] = useLoad(() => listAudit({ contractId: contract.id, limit: 100 }), [contract.id])
   return (
-    <Card title="History">
+    <Card title="History" id="history">
       <ErrorMsg error={error} />
       <ul className="divide-y divide-gray-100 text-xs">
         {rows?.map(r => (
