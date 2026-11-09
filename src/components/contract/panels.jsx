@@ -31,6 +31,7 @@ export function DocumentsPanel({ contract, canEdit, directory, onChange }) {
   const groups = Object.values((docs || []).reduce((acc, d) => { (acc[d.doc_key] ||= []).push(d); return acc }, {}))
     .map(g => g.sort((a, b) => b.version - a.version))
   const hasOriginal = (docs || []).some(d => d.role === 'original')
+  const hasMsa = (docs || []).some(d => d.role === 'msa')
 
   async function submit(e) {
     e.preventDefault(); setErr(null)
@@ -47,7 +48,14 @@ export function DocumentsPanel({ contract, canEdit, directory, onChange }) {
       <ErrorMsg error={error || err} />
       {!hasOriginal && docs && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-3 py-2 mb-3">
-          No executed original on file yet. A contract can't be set to Active until a PDF is uploaded as <strong>Original (executed)</strong>.
+          {contract.no_original_exception
+            ? <>No executed original on file. An admin recorded an exception: <em>{contract.no_original_reason}</em></>
+            : <>No executed original on file yet. A contract can't be set to Active until a PDF is uploaded as <strong>Original (executed)</strong>, or an admin records a "not on file" exception.</>}
+        </div>
+      )}
+      {contract.custom_msa && !hasMsa && docs && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-3 py-2 mb-3">
+          This contract has a custom MSA, but no copy is on file. A contract can't be set to Active until one is uploaded as <strong>MSA copy</strong>.
         </div>
       )}
       <ul className="divide-y divide-gray-100 mb-4">

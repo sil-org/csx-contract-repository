@@ -15,11 +15,15 @@ license-manager's `supabase/functions/README.md`). Authentication is done inside
 
 ## Secrets (`supabase secrets set ...`)
 
+All of these (other than `CRON_SECRET`, deliberately shared) are `CONTRACTS_`-prefixed:
+secrets are project-wide in this shared Supabase project, so a generic name like `AWS_REGION`
+would collide with (or get silently overwritten by) another app's secret of the same name.
+
 | Secret | Used by | Notes |
 |---|---|---|
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` | contract-documents | IAM user from `infra/iam-policy.json` — no delete permissions |
+| `CONTRACTS_AWS_ACCESS_KEY_ID`, `CONTRACTS_AWS_SECRET_ACCESS_KEY`, `CONTRACTS_AWS_REGION` | contract-documents | IAM user from `infra/iam-policy.json` — no delete permissions |
 | `CONTRACTS_BUCKET` | contract-documents | S3 bucket name |
-| `ALLOWED_ORIGINS` | contract-documents | e.g. `https://contracts.sil.org,http://localhost:5173` |
+| `CONTRACTS_ALLOWED_ORIGINS` | contract-documents | e.g. `https://contracts.sil.org,http://localhost:5173` |
 | `CONTRACTS_APP_ORIGIN` | contract-reminders | e.g. `https://contracts.sil.org` (links in emails) |
 | `CRON_SECRET` | contract-reminders | **Already set** for license-manager; same value, same Vault entry |
 

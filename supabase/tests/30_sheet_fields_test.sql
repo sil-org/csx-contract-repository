@@ -20,7 +20,7 @@ select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-0000000000a2
 create temp table made(id uuid); grant all on made to authenticated;
 with ins as (
   insert into contracts (title, system_name, type_id, counterparty_id, owner_id, department, department_manager,
-      annual_amount, annual_amount_note, mission_justification, initial_contract_date, initial_signer,
+      annual_amount, annual_amount_note, mission_justification, initial_contract_date, signatory_name,
       notice_period_days, notice_terms, last_renewal_date, expiration_date, administrators, corporate_license,
       google_sso, pricing_info, vendor_contact_note, notes)
   values ('Freshworks CRM', 'Freshworks CRM (Customer Relationship Management)',

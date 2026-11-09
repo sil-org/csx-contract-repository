@@ -14,7 +14,13 @@ most of the usual "new app" setup is already done. Do these in order.
    has thousands of profiles, so they are never all loaded at once).
    Then run [`supabase/contracts/04_sheet_fields.sql`](supabase/contracts/04_sheet_fields.sql), which adds the fields
    needed to hold everything in the existing Software Subscriptions tracking sheet (the header of that file maps every
-   sheet column to its field). Run 04 **before** the app update that uses it goes live. Re-running any of them is safe.
+   sheet column to its field).
+   Then run [`supabase/contracts/05_original_exception.sql`](supabase/contracts/05_original_exception.sql), which adds
+   the admin-only "original not on file" activation exception.
+   Then run [`supabase/contracts/06_signatory_and_custom_msa.sql`](supabase/contracts/06_signatory_and_custom_msa.sql),
+   which adds signatory name/email, department manager email, contract length, and the custom-MSA
+   attach-before-activating rule (the header of that file maps every new data element to its field).
+   Run each migration **before** the app update that uses it goes live. Re-running any of them is safe.
 2. **Allow this app's URLs.** Authentication → URL Configuration → add to **Redirect URLs**:
    `https://YOUR_DOMAIN/auth/callback` and `http://localhost:5173/auth/callback`.
    Leave **Site URL** alone — it belongs to license-manager.
@@ -48,11 +54,13 @@ Executed originals live in a private S3 bucket with versioning + Object Lock, ne
 
 ```bash
 supabase secrets set --project-ref <project-ref> \
-  AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=… AWS_REGION=us-east-1 CONTRACTS_BUCKET=your-unique-bucket-name \
-  ALLOWED_ORIGINS='https://YOUR_DOMAIN,http://localhost:5173' \
+  CONTRACTS_AWS_ACCESS_KEY_ID=… CONTRACTS_AWS_SECRET_ACCESS_KEY=… CONTRACTS_AWS_REGION=us-east-1 CONTRACTS_BUCKET=your-unique-bucket-name \
+  CONTRACTS_ALLOWED_ORIGINS='https://YOUR_DOMAIN,http://localhost:5173' \
   CONTRACTS_APP_ORIGIN='https://YOUR_DOMAIN'
 ```
-`CRON_SECRET` is already set (shared with license-manager's scheduled functions) — don't change it.
+These are `CONTRACTS_`-prefixed because secrets are project-wide (shared with license-manager) —
+a generic name like `AWS_REGION` could collide with another app's secret. `CRON_SECRET` is the one
+exception: it's already set and deliberately shared with license-manager's scheduled functions — don't change it.
 Full table: [`supabase/functions/README.md`](supabase/functions/README.md).
 
 ## 4. Email

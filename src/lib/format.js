@@ -43,7 +43,7 @@ export const BINDING_LABELS = { non_binding: 'Non-binding', partly_binding: 'Par
 export const RENEWAL_LABELS = { none: 'None', automatic: 'Automatic', option_to_renew: 'Option to renew', manual: 'Manual (mutual consent)' }
 export const DOC_ROLE_LABELS = {
   original: 'Original (executed)', amendment: 'Amendment', exhibit: 'Exhibit / Schedule',
-  correspondence: 'Correspondence', other: 'Other',
+  correspondence: 'Correspondence', msa: 'MSA copy', other: 'Other',
 }
 export const DECISION_LABELS = { renew: 'Renew', renegotiate: 'Renegotiate', terminate: 'Terminate', no_action: 'No action needed' }
 export const ROLE_LABELS = { viewer: 'Viewer', contributor: 'Contributor', auditor: 'Auditor', admin: 'Admin' }

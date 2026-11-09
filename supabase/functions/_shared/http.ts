@@ -1,8 +1,9 @@
 // Shared helpers for this app's Edge Functions.
 
 export function corsHeaders(req?: Request): Record<string, string> {
-  // ALLOWED_ORIGINS: comma-separated list (e.g. "https://contracts.sil.org,http://localhost:5173").
-  const allowed = (Deno.env.get('ALLOWED_ORIGINS') ?? 'http://localhost:5173').split(',').map(s => s.trim())
+  // CONTRACTS_ALLOWED_ORIGINS: comma-separated list (e.g. "https://contracts.sil.org,http://localhost:5173").
+  // Prefixed (not ALLOWED_ORIGINS) because Edge Function secrets are project-wide, shared with license-manager.
+  const allowed = (Deno.env.get('CONTRACTS_ALLOWED_ORIGINS') ?? 'http://localhost:5173').split(',').map(s => s.trim())
   const origin = req?.headers.get('Origin') ?? ''
   return {
     'Access-Control-Allow-Origin': allowed.includes(origin) ? origin : allowed[0],

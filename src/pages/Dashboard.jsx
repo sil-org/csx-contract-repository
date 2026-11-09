@@ -94,7 +94,7 @@ export default function Dashboard() {
           {(drafts > 0 || noReminders.length > 0) && (
             <Card title="Needs attention">
               <ul className="text-sm text-gray-700 space-y-1.5">
-                {drafts > 0 && <li><Link className="text-brand hover:underline" to="/contracts?status=draft">{drafts} draft contract{drafts === 1 ? '' : 's'}</Link> — not active until the executed original is uploaded.</li>}
+                {drafts > 0 && <li><Link className="text-brand hover:underline" to="/contracts?status=draft">{drafts} draft contract{drafts === 1 ? '' : 's'}</Link> — not active until the executed original is uploaded, or an admin records a "not on file" exception.</li>}
                 {noReminders.map(c => <li key={c.id}><Link className="text-brand hover:underline" to={`/contracts/${c.id}`}>{c.title}</Link> <StatusBadge status={c.status} /> — reminders are turned off.</li>)}
               </ul>
             </Card>

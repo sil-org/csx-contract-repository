@@ -7,7 +7,7 @@ const fw = {
   binding_status: 'binding', sensitivity: 'standard', tags: ['core-operational'], notes: 'https://drive.google.com/open?id=17jQN', renewal_type: 'automatic', renewal_term: '12 months',
   notice_period_days: 60, notice_terms: '60 days', notice_deadline: '2026-09-11', termination_for_convenience: null, termination_notice_days: null,
   value_amount: null, currency: 'USD', payment_terms: null, billing_frequency: null, budget_code: null, annual_amount: 35000, annual_amount_note: 'quoted as $35k',
-  mission_justification: 'As a non profit, our donors are critical to our mission.', initial_contract_date: '2020-11-06', initial_signer: 'Sheryl Howe', last_renewal_date: '2025-11-10',
+  mission_justification: 'As a non profit, our donors are critical to our mission.', initial_contract_date: '2020-11-06', signatory_name: 'Sheryl Howe', last_renewal_date: '2025-11-10',
   administrators: 'crm-admin@sil.org', corporate_license: true, google_sso: false, pricing_info: 'See most recent pricing', vendor_contact_note: 'Do not contact the vendor without speaking to the department manager.',
   parent_id: null, amends_id: null, superseded_by_id: null, details: {}, provisions: {}, reminders_enabled: true,
   type: { id: T1, name: 'Software subscription / system', form_kind: 'vendor' }, counterparty: { id: CP, name: 'Freshworks' } }
@@ -57,7 +57,7 @@ await t.page.getByText('System and subscription details').waitFor({ timeout: 800
 const val = async label => t.page.locator('label', { hasText: label }).locator('input, textarea, select').first().inputValue()
 check('form loads department manager', await val('Department manager') === 'Roy Eyre')
 check('form loads annual amount', await val('Annual amount (vendor license only)') === '35000')
-check('form loads initial signer', await val('Initial contract signer') === 'Sheryl Howe')
+check('form loads signatory name', await val('Signatory name') === 'Sheryl Howe')
 check('form loads corporate license = Yes and Google sign-in = No', await val('Corporate (organization-wide) license?') === 'true' && await val('Uses Google sign-in?') === 'false')
 check('form loads mission paragraph', (await val('Why this software advances our mission')).includes('donors'))
 await t.page.locator('label', { hasText: 'Annual amount: notes' }).locator('input').fill('  quoted as $35k + 2% fees  ')
@@ -71,7 +71,7 @@ check('annual_amount sent as a number', w.annual_amount === 35000)
 check('free-text notes are trimmed', w.annual_amount_note === 'quoted as $35k + 2% fees')
 check('emptied field is sent as null, not ""', w.administrators === null)
 check('yes stays true, unknown becomes null (never false)', w.corporate_license === true && w.google_sso === null)
-check('dates and names saved', w.initial_contract_date === '2020-11-06' && w.initial_signer === 'Sheryl Howe' && w.last_renewal_date === '2025-11-10' && w.notice_terms === '60 days' && w.system_name.startsWith('Freshworks'))
+check('dates and names saved', w.initial_contract_date === '2020-11-06' && w.signatory_name === 'Sheryl Howe' && w.last_renewal_date === '2025-11-10' && w.notice_terms === '60 days' && w.system_name.startsWith('Freshworks'))
 check('vendor contact rule saved', w.vendor_contact_note.startsWith('Do not contact'))
 check('no errors on edit/save', t.errors.length === 0); if (t.errors.length) console.log(t.errors)
 await t.close()

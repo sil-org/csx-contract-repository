@@ -18,7 +18,9 @@ import { corsHeaders, json } from '../_shared/http.ts'
 //                -> { id }  verifies the object exists with the expected checksum, then records it
 //   download-url { document_id } -> { url }   (logged to the audit trail)
 //
-// Required secrets: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, CONTRACTS_BUCKET.
+// Required secrets: CONTRACTS_AWS_ACCESS_KEY_ID, CONTRACTS_AWS_SECRET_ACCESS_KEY, CONTRACTS_AWS_REGION, CONTRACTS_BUCKET.
+// Prefixed because Edge Function secrets are project-wide (shared with license-manager) —
+// generic AWS_* names would collide with (or get clobbered by) another app's secrets.
 // The AWS user needs only s3:PutObject / GetObject / GetObjectVersion on the bucket —
 // deliberately NO delete permissions (infra/iam-policy.json).
 
@@ -29,16 +31,16 @@ const ALLOWED_TYPES = new Set([
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'image/png', 'image/jpeg',
 ])
-const ROLES = new Set(['original', 'amendment', 'exhibit', 'correspondence', 'other'])
+const ROLES = new Set(['original', 'amendment', 'exhibit', 'correspondence', 'msa', 'other'])
 const UPLOAD_TTL = 300
 const DOWNLOAD_TTL = 60
 
 const BUCKET = Deno.env.get('CONTRACTS_BUCKET')!
 const s3 = new S3Client({
-  region: Deno.env.get('AWS_REGION') ?? 'us-east-1',
+  region: Deno.env.get('CONTRACTS_AWS_REGION') ?? 'us-east-1',
   credentials: {
-    accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
-    secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
+    accessKeyId: Deno.env.get('CONTRACTS_AWS_ACCESS_KEY_ID')!,
+    secretAccessKey: Deno.env.get('CONTRACTS_AWS_SECRET_ACCESS_KEY')!,
   },
 })
 

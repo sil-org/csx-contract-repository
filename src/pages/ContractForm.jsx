@@ -3,7 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { getContract, listTypes, listCounterparties, getDirectory, listContracts, findOrCreateCounterparty, saveContract } from '../lib/contracts'
 import { STATUS_LABELS, BINDING_LABELS, RENEWAL_LABELS, PROVISIONS } from '../lib/format'
 import { Page, Card, Field, ErrorMsg, Loading, btnPrimary, btnSecondary, inputCls } from '../components/ui'
-import { useAuth } from '../context/AuthContext'
+import { useAuth, useCan } from '../context/AuthContext'
 import { ConfidentialNote } from '../components/ui'
 
 const EMPTY = {
@@ -14,9 +14,12 @@ const EMPTY = {
   value_amount: '', currency: 'USD', payment_terms: '', billing_frequency: '', budget_code: '',
   parent_id: '', amends_id: '', superseded_by_id: '', reminders_enabled: true, details: {}, provisions: {},
   // Fields from the existing tracking sheet
-  system_name: '', department_manager: '', annual_amount: '', annual_amount_note: '', mission_justification: '',
-  initial_contract_date: '', initial_signer: '', last_renewal_date: '', notice_terms: '', administrators: '',
+  system_name: '', department_manager: '', department_manager_email: '', annual_amount: '', annual_amount_note: '', mission_justification: '',
+  initial_contract_date: '', signatory_name: '', signatory_email: '', last_renewal_date: '', notice_terms: '', administrators: '',
   corporate_license: '', google_sso: '', pricing_info: '', vendor_contact_note: '',
+  no_original_exception: false, no_original_reason: '',
+  // New data-element list (2026-11-09)
+  contract_length_years: '', custom_msa: false,
 }
 
 const nz = v => (v === '' || v === undefined ? null : (typeof v === 'string' ? (v.trim() === '' ? null : v.trim()) : v))
@@ -28,6 +31,7 @@ export default function ContractForm() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { profile } = useAuth()
+  const can = useCan()
   const [form, setForm] = useState({ ...EMPTY, owner_id: profile?.id || '' })
   const [ref, setRef] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -63,6 +67,9 @@ export default function ContractForm() {
     setSaving(true); setError(null)
     try {
       if (!form.counterparty.trim()) throw new Error('Counterparty is required.')
+      if (can.admin && form.no_original_exception && !form.no_original_reason.trim()) {
+        throw new Error('A reason is required to mark the original as not on file.')
+      }
       const counterparty_id = await findOrCreateCounterparty(form.counterparty)
       const fields = {
         title: form.title.trim(), type_id: form.type_id, counterparty_id, owner_id: form.owner_id,
@@ -80,12 +87,19 @@ export default function ContractForm() {
         parent_id: nz(form.parent_id), amends_id: nz(form.amends_id), superseded_by_id: nz(form.superseded_by_id),
         reminders_enabled: form.reminders_enabled, details: form.details, provisions: form.provisions,
         system_name: nz(form.system_name), department_manager: nz(form.department_manager),
+        department_manager_email: nz(form.department_manager_email),
         annual_amount: nz(form.annual_amount) === null ? null : Number(form.annual_amount), annual_amount_note: nz(form.annual_amount_note),
         mission_justification: nz(form.mission_justification), initial_contract_date: nz(form.initial_contract_date),
-        initial_signer: nz(form.initial_signer), last_renewal_date: nz(form.last_renewal_date), notice_terms: nz(form.notice_terms),
+        signatory_name: nz(form.signatory_name), signatory_email: nz(form.signatory_email),
+        last_renewal_date: nz(form.last_renewal_date), notice_terms: nz(form.notice_terms),
         administrators: nz(form.administrators), corporate_license: triOut(form.corporate_license), google_sso: triOut(form.google_sso),
         pricing_info: nz(form.pricing_info), vendor_contact_note: nz(form.vendor_contact_note),
+        contract_length_years: nz(form.contract_length_years) === null ? null : Number(form.contract_length_years),
+        custom_msa: form.custom_msa,
         ...(id ? { status: form.status } : {}),
+        // Only admins may grant/revoke this (enforced in the DB too); leaving these out of
+        // the payload for non-admins keeps their edits from touching an existing exception.
+        ...(can.admin ? { no_original_exception: form.no_original_exception, no_original_reason: nz(form.no_original_reason) } : {}),
       }
       const saved = await saveContract(id, fields)
       navigate(`/contracts/${saved.id}`)
@@ -101,6 +115,7 @@ export default function ContractForm() {
   const people = ref.directory.map(p => <option key={p.id} value={p.id}>{p.display_name}</option>)
   const others = ref.contracts.filter(c => c.id !== id)
   const contractOpts = others.map(c => <option key={c.id} value={c.id}>{c.title} — {c.counterparty?.name}</option>)
+  const departments = [...new Set(ref.contracts.map(c => c.department).filter(Boolean))].sort()
 
   return (
     <Page title={id ? 'Edit contract' : 'New contract'}>
@@ -111,6 +126,7 @@ export default function ContractForm() {
             <Field label="Title" required className="md:col-span-2">{text('title', { required: true })}</Field>
             <Field label="System / product" hint="e.g. Zoom, Freshworks CRM — the thing the contract is for.">{text('system_name')}</Field>
             <Field label="Department manager">{text('department_manager')}</Field>
+            <Field label="Department manager email">{text('department_manager_email', { type: 'email' })}</Field>
             <Field label="Contract type" required>
               <select className={inputCls} required value={form.type_id} onChange={e => set('type_id', e.target.value)}>
                 {ref.types.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -130,13 +146,16 @@ export default function ContractForm() {
                 <option value="">None</option>{people}
               </select>
             </Field>
-            <Field label="Department / program" required>{text('department', { required: true })}</Field>
+            <Field label="Department / program" required hint="Pick an existing one, or type a new name.">
+              <input className={inputCls} list="departments" required value={form.department} onChange={e => set('department', e.target.value)} />
+              <datalist id="departments">{departments.map(d => <option key={d} value={d} />)}</datalist>
+            </Field>
             {id && <Field label="Status" hint="Activating requires an uploaded executed original, plus effective and signed dates.">
               <select className={inputCls} value={form.status} onChange={e => set('status', e.target.value)}>
                 {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </Field>}
-            <Field label="Binding status" required>
+            <Field label="Binding status">
               <select className={inputCls} value={form.binding_status} onChange={e => set('binding_status', e.target.value)}>
                 {Object.entries(BINDING_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
@@ -155,7 +174,8 @@ export default function ContractForm() {
         <Card title="Dates and renewal">
           <div className="grid md:grid-cols-3 gap-4">
             <Field label="Initial contract date" hint="When the very first agreement was made.">{text('initial_contract_date', { type: 'date' })}</Field>
-            <Field label="Initial contract signer">{text('initial_signer')}</Field>
+            <Field label="Signatory name">{text('signatory_name')}</Field>
+            <Field label="Signatory email">{text('signatory_email', { type: 'email' })}</Field>
             <Field label="Last renewal date">{text('last_renewal_date', { type: 'date' })}</Field>
             <Field label="Signed date (current term)">{text('signed_date', { type: 'date' })}</Field>
             <Field label="Effective date">{text('effective_date', { type: 'date' })}</Field>
@@ -169,6 +189,7 @@ export default function ContractForm() {
               </select>
             </Field>
             <Field label="Renewal term" hint="e.g. 12 months">{text('renewal_term')}</Field>
+            <Field label="Contract length (years)">{text('contract_length_years', { type: 'number', step: '0.1', min: 0 })}</Field>
             <Field label="Notice period (days)" hint="Days before expiry that notice of non-renewal/termination is due. Reminders count down to this deadline, not the expiry.">
               {text('notice_period_days', { type: 'number', min: 0 })}
             </Field>
@@ -184,6 +205,20 @@ export default function ContractForm() {
             </label>
           </div>
         </Card>
+
+        {can.admin && (
+          <Card title="Activation exception (admin only)">
+            <label className="flex items-center gap-2 text-sm mb-3">
+              <input type="checkbox" checked={form.no_original_exception} onChange={e => set('no_original_exception', e.target.checked)} />
+              Original not on file — allow this contract to become Active without an uploaded executed original
+            </label>
+            {form.no_original_exception && (
+              <Field label="Reason" required hint="Shown on the contract as a badge; required to activate without an original.">
+                <textarea className={inputCls} rows={2} required value={form.no_original_reason} onChange={e => set('no_original_reason', e.target.value)} />
+              </Field>
+            )}
+          </Card>
+        )}
 
         {(kind === 'vendor' || kind === 'sow' || kind === 'other') && (
           <Card title="Financial">
@@ -217,6 +252,14 @@ export default function ContractForm() {
                   <option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option></select>
               </Field>
               <Field label="Vendor contact rule" hint="e.g. “Do not contact the vendor without speaking to the department manager.”" className="md:col-span-2">{text('vendor_contact_note')}</Field>
+              <label className="flex items-center gap-2 text-sm self-end pb-2">
+                <input type="checkbox" checked={form.custom_msa} onChange={e => set('custom_msa', e.target.checked)} /> Custom MSA
+              </label>
+              {form.custom_msa && (
+                <p className="text-xs text-amber-700 md:col-span-2">
+                  A copy of the MSA must be attached under Documents (type “MSA copy”) before this contract can be made Active.
+                </p>
+              )}
             </div>
           </Card>
         )}
