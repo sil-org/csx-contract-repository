@@ -1,8 +1,10 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useState } from 'react'
-import { Menu, X, LogOut, ChevronDown } from 'lucide-react'
+import { Menu, X, LogOut, ChevronDown, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { signOut } from '../lib/auth'
+
+const COLLAPSE_KEY = 'contracts.sidebarCollapsed'
 
 // Left sidebar shell for apps with more than one or two pages. `links` is:
 //   [{ to?, label, icon: LucideIcon, roles?: ContractRole[], badge?, children?: [{to,label,roles?}] }]
@@ -20,6 +22,15 @@ export default function AppLayout({ appName, links, children }) {
   const fullPath = pathname + search
   const [mobileOpen, setMobileOpen] = useState(false)
   const [openSections, setOpenSections] = useState(new Set())
+  // Desktop-only sidebar collapse; persisted so it survives navigating between pages (AppLayout
+  // remounts per route). Mobile always shows the full overlay nav, so this never applies there.
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem(COLLAPSE_KEY) === '1' } catch { return false }
+  })
+  const toggleCollapsed = () => setCollapsed(c => {
+    try { localStorage.setItem(COLLAPSE_KEY, c ? '0' : '1') } catch {}
+    return !c
+  })
 
   // `roles` limits a link (or sub-link) to specific contract roles; omitted = everyone with access.
   const allowed = l => !l.roles || l.roles.includes(contractRole)
@@ -61,14 +72,23 @@ export default function AppLayout({ appName, links, children }) {
       )}
 
       <nav
-        className={`w-56 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col
-          fixed md:sticky top-0 h-screen z-30 transition-transform duration-200
+        className={`${collapsed ? 'md:w-16' : 'md:w-56'} w-56 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col
+          fixed md:sticky top-0 h-screen z-30 transition-transform duration-200 md:transition-[width] md:duration-150
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}
       >
-        <div className="px-4 py-4 flex items-center gap-2 border-b border-gray-100">
-          <img src="/sil-logo.png" alt="" className="h-6" />
-          <span className="font-display font-bold text-brand text-sm leading-tight">{appName}</span>
+        <div className={`px-4 py-4 flex items-center gap-2 border-b border-gray-100 ${collapsed ? 'md:px-0 md:justify-center' : ''}`}>
+          <img src="/sil-logo.png" alt="" className="h-6 flex-shrink-0" />
+          {!collapsed && <span className="font-display font-bold text-brand text-sm leading-tight truncate">{appName}</span>}
         </div>
+
+        <button
+          onClick={toggleCollapsed}
+          title={collapsed ? 'Expand menu' : 'Collapse menu'}
+          className={`hidden md:flex items-center gap-2 px-4 py-2 text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-50 border-b border-gray-100
+            ${collapsed ? 'justify-center' : ''}`}
+        >
+          {collapsed ? <ChevronsRight size={15} /> : <><ChevronsLeft size={15} /> Collapse</>}
+        </button>
 
         <div className="flex-1 py-2 flex flex-col overflow-y-auto">
           {visibleLinks.map(link => {
@@ -81,29 +101,31 @@ export default function AppLayout({ appName, links, children }) {
               <div key={link.to || link.label}>
                 <RowTag
                   to={link.to}
+                  title={collapsed ? link.label : undefined}
                   onClick={() => {
                     if (link.to) setMobileOpen(false)
-                    else toggleSection(link.label)
+                    else if (!collapsed) toggleSection(link.label)
                   }}
                   className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm border-l-[3px] transition-colors text-left
+                    ${collapsed ? 'md:justify-center md:px-0' : ''}
                     ${active
                       ? 'border-brand text-brand bg-brand/[0.08] font-semibold'
                       : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}
                 >
                   {Icon && <Icon size={16} className="flex-shrink-0" />}
-                  <span className="truncate">{link.label}</span>
+                  <span className={`truncate ${collapsed ? 'md:hidden' : ''}`}>{link.label}</span>
                   {!!link.badge && (
-                    <span className="ml-auto bg-brand text-white rounded-full text-[11px] font-semibold px-1.5 leading-4">
+                    <span className={`ml-auto bg-brand text-white rounded-full text-[11px] font-semibold px-1.5 leading-4 ${collapsed ? 'md:hidden' : ''}`}>
                       {link.badge}
                     </span>
                   )}
                   {link.children?.length > 0 && (
-                    <ChevronDown size={14} className={`ml-auto flex-shrink-0 transition-transform ${expanded ? 'rotate-180' : ''} ${link.badge ? 'ml-1' : ''}`} />
+                    <ChevronDown size={14} className={`ml-auto flex-shrink-0 transition-transform ${expanded ? 'rotate-180' : ''} ${link.badge ? 'ml-1' : ''} ${collapsed ? 'md:hidden' : ''}`} />
                   )}
                 </RowTag>
 
                 {link.children?.length > 0 && expanded && (
-                  <div className="flex flex-col">
+                  <div className={collapsed ? 'md:hidden flex flex-col' : 'flex flex-col'}>
                     {link.children.map(child => (
                       <Link
                         key={child.to}
@@ -124,10 +146,10 @@ export default function AppLayout({ appName, links, children }) {
           })}
         </div>
 
-        <div className="px-4 py-3 border-t border-gray-100 text-xs text-gray-500">
-          <p className="truncate mb-1.5">{profile?.primary_email}</p>
-          <button onClick={signOut} className="flex items-center gap-1.5 text-brand hover:underline">
-            <LogOut size={13} /> Sign out
+        <div className={`px-4 py-3 border-t border-gray-100 text-xs text-gray-500 ${collapsed ? 'md:px-2 md:flex md:justify-center' : ''}`}>
+          {!collapsed && <p className="truncate mb-1.5">{profile?.primary_email}</p>}
+          <button onClick={signOut} title="Sign out" className="flex items-center gap-1.5 text-brand hover:underline">
+            <LogOut size={13} /> {!collapsed && 'Sign out'}
           </button>
         </div>
       </nav>
