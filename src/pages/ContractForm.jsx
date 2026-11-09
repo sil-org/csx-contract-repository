@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { getContract, listTypes, listCounterparties, getDirectory, listContracts, findOrCreateCounterparty, saveContract } from '../lib/contracts'
 import { STATUS_LABELS, BINDING_LABELS, RENEWAL_LABELS, PROVISIONS } from '../lib/format'
-import { Page, Card, Field, ErrorMsg, Loading, btnPrimary, btnSecondary, inputCls } from '../components/ui'
+import { Page, Card, SectionNav, Field, ErrorMsg, Loading, btnPrimary, btnSecondary, inputCls } from '../components/ui'
 import { useAuth, useCan } from '../context/AuthContext'
 import { ConfidentialNote } from '../components/ui'
 
@@ -117,11 +117,23 @@ export default function ContractForm() {
   const contractOpts = others.map(c => <option key={c.id} value={c.id}>{c.title} — {c.counterparty?.name}</option>)
   const departments = [...new Set(ref.contracts.map(c => c.department).filter(Boolean))].sort()
 
+  const typeDetailsLabel = { mou: 'MOU details', sow: 'SOW details', vendor: 'Vendor details' }[kind]
+  const navItems = [
+    { id: 'basics', label: 'Basics' },
+    { id: 'dates', label: 'Dates and renewal' },
+    { id: 'exception', label: 'Activation exception', show: can.admin },
+    { id: 'financial', label: 'Financial', show: kind === 'vendor' || kind === 'sow' || kind === 'other' },
+    { id: 'system', label: 'System and subscription', show: kind === 'vendor' || kind === 'other' },
+    { id: 'type-details', label: typeDetailsLabel, show: !!typeDetailsLabel },
+    { id: 'relationships', label: 'Relationships and provisions' },
+  ]
+
   return (
     <Page title={id ? 'Edit contract' : 'New contract'}>
       <ErrorMsg error={error} />
+      <SectionNav items={navItems} />
       <form onSubmit={submit}>
-        <Card title="Basics">
+        <Card title="Basics" id="basics">
           <div className="grid md:grid-cols-2 gap-4">
             <Field label="Title" required className="md:col-span-2">{text('title', { required: true })}</Field>
             <Field label="System / product" hint="e.g. Zoom, Freshworks CRM — the thing the contract is for.">{text('system_name')}</Field>
@@ -171,7 +183,7 @@ export default function ContractForm() {
           </div>
         </Card>
 
-        <Card title="Dates and renewal">
+        <Card title="Dates and renewal" id="dates">
           <div className="grid md:grid-cols-3 gap-4">
             <Field label="Initial contract date" hint="When the very first agreement was made.">{text('initial_contract_date', { type: 'date' })}</Field>
             <Field label="Signatory name">{text('signatory_name')}</Field>
@@ -207,7 +219,7 @@ export default function ContractForm() {
         </Card>
 
         {can.admin && (
-          <Card title="Activation exception (admin only)">
+          <Card title="Activation exception (admin only)" id="exception">
             <label className="flex items-center gap-2 text-sm mb-3">
               <input type="checkbox" checked={form.no_original_exception} onChange={e => set('no_original_exception', e.target.checked)} />
               Original not on file — allow this contract to become Active without an uploaded executed original
@@ -221,7 +233,7 @@ export default function ContractForm() {
         )}
 
         {(kind === 'vendor' || kind === 'sow' || kind === 'other') && (
-          <Card title="Financial">
+          <Card title="Financial" id="financial">
             <ConfidentialNote />
             <div className="grid md:grid-cols-3 gap-4">
               <Field label="Annual amount (vendor license only)">{text('annual_amount', { type: 'number', step: '0.01', min: 0 })}</Field>
@@ -236,7 +248,7 @@ export default function ContractForm() {
         )}
 
         {(kind === 'vendor' || kind === 'other') && (
-          <Card title="System and subscription details">
+          <Card title="System and subscription details" id="system">
             <div className="grid md:grid-cols-2 gap-4">
               <Field label="Why this software advances our mission" hint="One paragraph." className="md:col-span-2">
                 <textarea className={inputCls} rows={4} value={form.mission_justification} onChange={e => set('mission_justification', e.target.value)} />
@@ -265,7 +277,7 @@ export default function ContractForm() {
         )}
 
         {kind === 'mou' && (
-          <Card title="MOU details">
+          <Card title="MOU details" id="type-details">
             <div className="grid md:grid-cols-2 gap-4">
               <Field label="Purpose" className="md:col-span-2"><textarea className={inputCls} rows={2} value={d.purpose || ''} onChange={e => setDetail('purpose', e.target.value)} /></Field>
               <Field label="Expected next step" hint="e.g. definitive agreement"><input className={inputCls} value={d.next_step || ''} onChange={e => setDetail('next_step', e.target.value)} /></Field>
@@ -275,7 +287,7 @@ export default function ContractForm() {
           </Card>
         )}
         {kind === 'sow' && (
-          <Card title="SOW details">
+          <Card title="SOW details" id="type-details">
             <div className="grid md:grid-cols-2 gap-4">
               <Field label="Project name"><input className={inputCls} value={d.project_name || ''} onChange={e => setDetail('project_name', e.target.value)} /></Field>
               <Field label="Parent agreement (MSA)">
@@ -287,7 +299,7 @@ export default function ContractForm() {
           </Card>
         )}
         {kind === 'vendor' && (
-          <Card title="Vendor details">
+          <Card title="Vendor details" id="type-details">
             <div className="grid md:grid-cols-2 gap-4">
               <Field label="Vendor contact"><input className={inputCls} value={d.vendor_contact || ''} onChange={e => setDetail('vendor_contact', e.target.value)} /></Field>
               <Field label="Insurance / compliance certificate expiry"><input type="date" className={inputCls} value={d.insurance_expiry || ''} onChange={e => setDetail('insurance_expiry', e.target.value)} /></Field>
@@ -300,7 +312,7 @@ export default function ContractForm() {
           </Card>
         )}
 
-        <Card title="Relationships and provisions">
+        <Card title="Relationships and provisions" id="relationships">
           <div className="grid md:grid-cols-2 gap-4 mb-4">
             {kind === 'other' && <Field label="Parent agreement"><select className={inputCls} value={form.parent_id} onChange={e => set('parent_id', e.target.value)}><option value="">None</option>{contractOpts}</select></Field>}
             <Field label="This is an amendment to" hint="Links to the contract it amends."><select className={inputCls} value={form.amends_id} onChange={e => set('amends_id', e.target.value)}><option value="">Not an amendment</option>{contractOpts}</select></Field>

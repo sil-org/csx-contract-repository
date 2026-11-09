@@ -20,7 +20,7 @@ export function Page({ title, actions, children, wide }) {
 
 export function Card({ title, children, actions, id }) {
   return (
-    <section id={id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-5">
+    <section id={id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-5 scroll-mt-4">
       {(title || actions) && (
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold text-gray-800">{title}</h2>
@@ -29,6 +29,28 @@ export function Card({ title, children, actions, id }) {
       )}
       {children}
     </section>
+  )
+}
+
+// Jump-links to the id'd Card sections on a long page. Pass every possible
+// section with `show`: only true ones render, so the nav never links to a
+// section that isn't actually on the page. Renders nothing for 0-1 sections.
+export function SectionNav({ items }) {
+  const visible = items.filter(i => i.show !== false)
+  if (visible.length < 2) return null
+  return (
+    <nav aria-label="Jump to section" className="flex flex-wrap gap-x-4 gap-y-1.5 mb-5 pb-3 border-b border-gray-200 text-sm">
+      {visible.map(i => (
+        <a
+          key={i.id}
+          href={`#${i.id}`}
+          className="text-gray-500 hover:text-brand hover:underline"
+          onClick={e => { e.preventDefault(); document.getElementById(i.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}
+        >
+          {i.label}
+        </a>
+      ))}
+    </nav>
   )
 }
 
