@@ -157,7 +157,9 @@ Deno.serve(async (req) => {
         new GetObjectCommand({
           Bucket: BUCKET, Key: doc.s3_key, VersionId: doc.s3_version_id,   // pin the exact version
           ResponseContentType: doc.content_type,
-          ResponseContentDisposition: `attachment; filename="${safeName(doc.filename)}"`,
+          // inline, not attachment: lets the browser display PDFs/images directly in the
+          // new tab window.open() opens them in, rather than forcing a save-file dialog.
+          ResponseContentDisposition: `inline; filename="${safeName(doc.filename)}"`,
         }),
         { expiresIn: DOWNLOAD_TTL },
       )
