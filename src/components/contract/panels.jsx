@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Download, Upload, Trash2, ExternalLink } from 'lucide-react'
+import { Upload, Trash2, ExternalLink } from 'lucide-react'
 import { Card, Field, ErrorMsg, btnPrimary, btnSecondary, inputCls } from '../ui'
 import { fmtDate, fmtDateTime, fmtBytes, daysUntil, DOC_ROLE_LABELS, DECISION_LABELS } from '../../lib/format'
 import {
@@ -65,7 +65,7 @@ export function DocumentsPanel({ contract, canEdit, directory, onChange }) {
               <span className="text-xs font-semibold bg-gray-100 text-gray-700 rounded px-2 py-0.5">{DOC_ROLE_LABELS[g[0].role]}</span>
               <span className="font-medium text-sm">{g[0].filename}</span>
               <span className="text-xs text-gray-400">v{g[0].version} · {fmtBytes(g[0].size_bytes)}</span>
-              <button className="ml-auto text-brand text-sm inline-flex items-center gap-1 hover:underline" onClick={() => open(g[0].id)}><Download size={14} /> Download</button>
+              <button className="ml-auto text-brand text-sm inline-flex items-center gap-1 hover:underline" onClick={() => open(g[0].id)}><ExternalLink size={14} /> Open</button>
             </div>
             <ul className="mt-1.5 ml-2 space-y-0.5">
               {g.map(d => (
@@ -74,7 +74,7 @@ export function DocumentsPanel({ contract, canEdit, directory, onChange }) {
                   <span>{fmtDateTime(d.uploaded_at)} · {nameOf(directory, d.uploaded_by)}</span>
                   <span className="italic">“{d.change_note}”</span>
                   <span className="font-mono text-gray-400" title={`SHA-256 ${d.sha256}`}>sha256 {d.sha256.slice(0, 10)}…</span>
-                  {d.version !== g[0].version && <button className="text-brand hover:underline" onClick={() => open(d.id)}>download</button>}
+                  {d.version !== g[0].version && <button className="text-brand hover:underline" onClick={() => open(d.id)}>open</button>}
                 </li>
               ))}
             </ul>
