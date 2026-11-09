@@ -40,13 +40,22 @@ aws s3api put-object-lock-configuration --bucket "$BUCKET" --object-lock-configu
 
 # Browser uploads go straight to S3 via presigned URLs, so the bucket needs CORS for the app origins.
 ORIGINS_JSON="$(printf '%s' "$ALLOWED_ORIGINS" | python3 -c 'import json,sys; print(json.dumps([o.strip() for o in sys.stdin.read().split(",") if o.strip()]))')"
-python3 - "$HERE/cors.json" "$ORIGINS_JSON" > /tmp/contracts-cors.json <<'PY'
+CORS_TMP="$(mktemp)"
+python3 - "$HERE/cors.json" "$ORIGINS_JSON" > "$CORS_TMP" <<'PY'
 import json, sys
 cfg = json.load(open(sys.argv[1]))
 cfg["CORSRules"][0]["AllowedOrigins"] = json.loads(sys.argv[2])
 print(json.dumps(cfg))
 PY
-aws s3api put-bucket-cors --bucket "$BUCKET" --cors-configuration file:///tmp/contracts-cors.json
+# On Git Bash, `aws` is a native Windows exe that can't resolve a bare /tmp/... path
+# passed inside a file:// URI, so hand it a Windows path when cygpath is around.
+if command -v cygpath >/dev/null 2>&1; then
+  CORS_TMP_FOR_AWS="$(cygpath -w "$CORS_TMP")"
+else
+  CORS_TMP_FOR_AWS="$CORS_TMP"
+fi
+aws s3api put-bucket-cors --bucket "$BUCKET" --cors-configuration "file://$CORS_TMP_FOR_AWS"
+rm -f "$CORS_TMP"
 
 echo
 echo "Done. Next: create the limited IAM user from infra/iam-policy.json (replace BUCKET_NAME),"

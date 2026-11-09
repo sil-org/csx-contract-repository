@@ -32,7 +32,7 @@ bulk import, full-text/OCR search, retention and legal hold) are listed in the r
 
 ```
 src/                       React app (pages/, components/, lib/)
-supabase/contracts/        SQL migrations (01, 02, 03) — run in order in the Supabase SQL Editor
+supabase/contracts/        SQL migrations (01 – 06) — run in order in the Supabase SQL Editor
 supabase/functions/        contract-documents, contract-reminders (+ _shared)
 supabase/tests/            SQL tests + run.sh (throwaway local Postgres)
 infra/                     S3 bucket script, CORS and least-privilege IAM policy
