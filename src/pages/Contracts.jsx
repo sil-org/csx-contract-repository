@@ -1,14 +1,24 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Plus } from 'lucide-react'
+import { Plus, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { listContracts, listTypes, listCounterparties, getDirectory } from '../lib/contracts'
-import { fmtDate, fmtMoney, STATUS_LABELS } from '../lib/format'
+import { fmtDate, fmtMoney, STATUS_LABELS, typeAbbrev } from '../lib/format'
 import { Page, Card, StatusBadge, ErrorMsg, Loading, ConfidentialNote, btnPrimary, inputCls } from '../components/ui'
+import MultiSelect from '../components/MultiSelect'
 import { useCan } from '../context/AuthContext'
 
 const NUMERIC_SORT_KEYS = new Set(['value'])
-// Filter params that aren't the default sort/page chrome — used to show/clear "filters active".
-const FILTER_KEYS = ['q', 'status', 'type', 'owner', 'dept', 'vendor', 'valueMin', 'valueMax', 'signedFrom', 'signedTo', 'renewFrom', 'renewTo']
+// Scalar (single-value) vs. multi-select filter params — kept separate because multi-select
+// values are read/written as repeated query params (?status=active&status=draft), not one string.
+const SCALAR_FILTER_KEYS = ['q', 'valueMin', 'valueMax', 'signedFrom', 'signedTo', 'renewFrom', 'renewTo']
+const MULTI_FILTER_KEYS = ['status', 'type', 'owner', 'dept', 'vendor']
+const FILTER_KEYS = [...SCALAR_FILTER_KEYS, ...MULTI_FILTER_KEYS]
+// New contracts are overwhelmingly what people want to see day-to-day; everything else (expired,
+// terminated, etc.) is opt-in. Only applies until the status filter is touched (see `f.status` below).
+const DEFAULT_STATUSES = ['active', 'draft']
+// Marks "status" as explicitly cleared to nothing (distinct from untouched, which defaults above).
+const ALL_SENTINEL = '__all__'
+const FILTERS_COLLAPSE_KEY = 'contracts.filtersCollapsed'
 
 // Filter/sort by type, status, counterparty, owner, department, tag, text, value, and date ranges (R-S1/R-S2 metadata).
 export default function Contracts() {
@@ -16,6 +26,13 @@ export default function Contracts() {
   const [params, setParams] = useSearchParams()
   const [state, setState] = useState({ loading: true })
   const [sort, setSort] = useState({ key: 'title', dir: 1 })
+  const [filtersCollapsed, setFiltersCollapsed] = useState(() => {
+    try { return localStorage.getItem(FILTERS_COLLAPSE_KEY) === '1' } catch { return false }
+  })
+  const toggleFiltersCollapsed = () => setFiltersCollapsed(c => {
+    try { localStorage.setItem(FILTERS_COLLAPSE_KEY, c ? '0' : '1') } catch {}
+    return !c
+  })
 
   useEffect(() => {
     Promise.all([listContracts(), listTypes({ includeInactive: true }), listCounterparties(), getDirectory()])
@@ -23,10 +40,26 @@ export default function Contracts() {
       .catch(error => setState({ loading: false, error }))
   }, [])
 
-  const f = Object.fromEntries(FILTER_KEYS.map(k => [k, params.get(k) || '']))
+  const f = {
+    ...Object.fromEntries(SCALAR_FILTER_KEYS.map(k => [k, params.get(k) || ''])),
+    ...Object.fromEntries(['type', 'owner', 'dept', 'vendor'].map(k => [k, params.getAll(k)])),
+    status: (() => {
+      const raw = params.getAll('status')
+      if (!raw.length) return DEFAULT_STATUSES
+      if (raw.length === 1 && raw[0] === ALL_SENTINEL) return []
+      return raw
+    })(),
+  }
   const set = (k, v) => { const p = new URLSearchParams(params); v ? p.set(k, v) : p.delete(k); setParams(p, { replace: true }) }
+  const setMulti = (k, arr) => {
+    const p = new URLSearchParams(params)
+    p.delete(k)
+    if (k === 'status' && arr.length === 0) p.append(k, ALL_SENTINEL)
+    else arr.forEach(v => p.append(k, v))
+    setParams(p, { replace: true })
+  }
   const clearFilters = () => { const p = new URLSearchParams(params); FILTER_KEYS.forEach(k => p.delete(k)); setParams(p, { replace: true }) }
-  const filtersActive = FILTER_KEYS.some(k => f[k])
+  const filtersActive = SCALAR_FILTER_KEYS.some(k => f[k]) || ['type', 'owner', 'dept', 'vendor'].some(k => f[k].length) || params.has('status')
 
   const ownerName = id => state.directory?.find(p => p.id === id)?.display_name || ''
   const departments = useMemo(() => [...new Set((state.contracts || []).map(c => c.department))].sort(), [state.contracts])
@@ -34,9 +67,9 @@ export default function Contracts() {
   const rows = useMemo(() => {
     const q = f.q.trim().toLowerCase()
     const out = (state.contracts || []).filter(c =>
-      (!f.status || c.status === f.status) && (!f.type || c.type_id === f.type) &&
-      (!f.owner || c.owner_id === f.owner) && (!f.dept || c.department === f.dept) &&
-      (!f.vendor || c.counterparty_id === f.vendor) &&
+      (!f.status.length || f.status.includes(c.status)) && (!f.type.length || f.type.includes(c.type_id)) &&
+      (!f.owner.length || f.owner.includes(c.owner_id)) && (!f.dept.length || f.dept.includes(c.department)) &&
+      (!f.vendor.length || f.vendor.includes(c.counterparty_id)) &&
       (!f.valueMin || (c.value_amount != null && c.value_amount >= Number(f.valueMin))) &&
       (!f.valueMax || (c.value_amount != null && c.value_amount <= Number(f.valueMax))) &&
       (!f.signedFrom || (c.signed_date && c.signed_date >= f.signedFrom)) &&
@@ -58,7 +91,9 @@ export default function Contracts() {
       signed: c.signed_date || '9999', renewed: c.last_renewal_date || '9999',
       notice: c.notice_deadline || '9999', expires: c.expiration_date || '9999' }[sort.key] ?? '')
     return out.sort((a, b) => String(val(a)).localeCompare(String(val(b))) * sort.dir)
-  }, [state, f.q, f.status, f.type, f.owner, f.dept, f.vendor, f.valueMin, f.valueMax, f.signedFrom, f.signedTo, f.renewFrom, f.renewTo, sort])
+    // Multi-select filters (f.status/type/owner/dept/vendor) are new arrays every render, so key
+    // off the URL's own string form instead of the arrays themselves.
+  }, [state, params.toString(), sort])
 
   // Summary of contract values for whatever is currently filtered in (R-S5 spend-by-vendor, lightweight version).
   // Grouped by currency rather than summed blindly — mixing currencies in one total would misrepresent spend.
@@ -106,45 +141,61 @@ export default function Contracts() {
     <Page wide title="Contracts" actions={can.add && <Link to="/contracts/new" className={btnPrimary}><Plus size={15} /> New contract</Link>}>
       <ErrorMsg error={state.error} />
       <div className="flex flex-col md:flex-row gap-5 items-start">
-        <aside className="w-full md:w-64 shrink-0 md:sticky md:top-20 bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-gray-800 text-sm">Filters</h2>
-            <button type="button" className="text-xs font-medium text-brand hover:underline disabled:text-gray-300 disabled:no-underline" onClick={clearFilters} disabled={!filtersActive}>Clear all</button>
+        <aside className={`w-full ${filtersCollapsed ? 'md:w-12' : 'md:w-64'} shrink-0 md:sticky md:top-20 bg-white rounded-xl shadow-sm border border-gray-100 p-4 transition-[width] duration-150`}>
+          <div className={`flex items-center gap-2 mb-3 ${filtersCollapsed ? 'justify-center' : 'justify-between'}`}>
+            {!filtersCollapsed && (
+              <h2 className="font-semibold text-gray-800 text-sm">
+                Filters{filtersActive && <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-brand align-middle" title="Filters active" />}
+              </h2>
+            )}
+            <div className="flex items-center gap-2">
+              {!filtersCollapsed && (
+                <button type="button" className="text-xs font-medium text-brand hover:underline disabled:text-gray-300 disabled:no-underline" onClick={clearFilters} disabled={!filtersActive}>Clear all</button>
+              )}
+              <button
+                type="button"
+                onClick={toggleFiltersCollapsed}
+                title={filtersCollapsed ? 'Show filters' : 'Collapse filters'}
+                className="text-gray-400 hover:text-gray-700 hover:bg-gray-50 p-1 rounded"
+              >
+                {filtersCollapsed ? <ChevronsRight size={15} /> : <ChevronsLeft size={15} />}
+              </button>
+            </div>
           </div>
-          <FilterField label="Search"><input className={inputCls} placeholder="Title, counterparty, tag…" value={f.q} onChange={e => set('q', e.target.value)} /></FilterField>
-          <FilterField label="Type">
-            <select className={inputCls} value={f.type} onChange={e => set('type', e.target.value)}>
-              <option value="">All types</option>{state.types?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-          </FilterField>
-          <FilterField label="Status">
-            <select className={inputCls} value={f.status} onChange={e => set('status', e.target.value)}>
-              <option value="">All statuses</option>{Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
-          </FilterField>
-          <FilterField label="Owner">
-            <select className={inputCls} value={f.owner} onChange={e => set('owner', e.target.value)}>
-              <option value="">All owners</option>{state.directory?.map(p => <option key={p.id} value={p.id}>{p.display_name}</option>)}
-            </select>
-          </FilterField>
-          <FilterField label="Department">
-            <select className={inputCls} value={f.dept} onChange={e => set('dept', e.target.value)}>
-              <option value="">All departments</option>{departments.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
-          </FilterField>
-          <FilterField label="Vendor">
-            <select className={inputCls} value={f.vendor} onChange={e => set('vendor', e.target.value)}>
-              <option value="">All vendors</option>{state.counterparties?.map(cp => <option key={cp.id} value={cp.id}>{cp.name}</option>)}
-            </select>
-          </FilterField>
-          <div className="grid grid-cols-2 gap-2">
-            <FilterField label="Value min"><input type="number" min="0" className={inputCls} value={f.valueMin} onChange={e => set('valueMin', e.target.value)} /></FilterField>
-            <FilterField label="Value max"><input type="number" min="0" className={inputCls} value={f.valueMax} onChange={e => set('valueMax', e.target.value)} /></FilterField>
-          </div>
-          <FilterField label="Signed after"><input type="date" className={inputCls} value={f.signedFrom} onChange={e => set('signedFrom', e.target.value)} /></FilterField>
-          <FilterField label="Signed before"><input type="date" className={inputCls} value={f.signedTo} onChange={e => set('signedTo', e.target.value)} /></FilterField>
-          <FilterField label="Last renewed after"><input type="date" className={inputCls} value={f.renewFrom} onChange={e => set('renewFrom', e.target.value)} /></FilterField>
-          <FilterField label="Last renewed before"><input type="date" className={inputCls} value={f.renewTo} onChange={e => set('renewTo', e.target.value)} /></FilterField>
+
+          {!filtersCollapsed && (
+            <>
+              <FilterField label="Search"><input className={inputCls} placeholder="Title, counterparty, tag…" value={f.q} onChange={e => set('q', e.target.value)} /></FilterField>
+              <FilterField label="Type">
+                <MultiSelect value={f.type} onChange={arr => setMulti('type', arr)} placeholder="All types"
+                  options={(state.types || []).map(t => ({ value: t.id, label: t.name }))} />
+              </FilterField>
+              <FilterField label="Status">
+                <MultiSelect value={f.status} onChange={arr => setMulti('status', arr)} placeholder="All statuses"
+                  options={Object.entries(STATUS_LABELS).map(([k, v]) => ({ value: k, label: v }))} />
+              </FilterField>
+              <FilterField label="Owner">
+                <MultiSelect value={f.owner} onChange={arr => setMulti('owner', arr)} placeholder="All owners"
+                  options={(state.directory || []).map(p => ({ value: p.id, label: p.display_name }))} />
+              </FilterField>
+              <FilterField label="Department">
+                <MultiSelect value={f.dept} onChange={arr => setMulti('dept', arr)} placeholder="All departments"
+                  options={departments.map(d => ({ value: d, label: d }))} />
+              </FilterField>
+              <FilterField label="Vendor">
+                <MultiSelect value={f.vendor} onChange={arr => setMulti('vendor', arr)} placeholder="All vendors"
+                  options={(state.counterparties || []).map(cp => ({ value: cp.id, label: cp.name }))} />
+              </FilterField>
+              <div className="grid grid-cols-2 gap-2">
+                <FilterField label="Value min"><input type="number" min="0" className={inputCls} value={f.valueMin} onChange={e => set('valueMin', e.target.value)} /></FilterField>
+                <FilterField label="Value max"><input type="number" min="0" className={inputCls} value={f.valueMax} onChange={e => set('valueMax', e.target.value)} /></FilterField>
+              </div>
+              <FilterField label="Signed after"><input type="date" className={inputCls} value={f.signedFrom} onChange={e => set('signedFrom', e.target.value)} /></FilterField>
+              <FilterField label="Signed before"><input type="date" className={inputCls} value={f.signedTo} onChange={e => set('signedTo', e.target.value)} /></FilterField>
+              <FilterField label="Last renewed after"><input type="date" className={inputCls} value={f.renewFrom} onChange={e => set('renewFrom', e.target.value)} /></FilterField>
+              <FilterField label="Last renewed before"><input type="date" className={inputCls} value={f.renewTo} onChange={e => set('renewTo', e.target.value)} /></FilterField>
+            </>
+          )}
         </aside>
 
         <div className="flex-1 min-w-0 w-full">
@@ -177,7 +228,7 @@ export default function Contracts() {
                         {c.no_original_exception && <span className="ml-2 text-[11px] font-semibold text-amber-800 bg-amber-100 rounded px-1.5 py-0.5" title={`Admin exception: no executed original is on file. Reason: ${c.no_original_reason}`}>No original</span>}
                         {c.custom_msa && <span className="ml-2 text-[11px] font-semibold text-blue-800 bg-blue-50 rounded px-1.5 py-0.5" title='This contract has a custom MSA: a signed copy must be attached (document type "MSA copy") before it can go Active.'>Custom MSA</span>}</td>
                       <td className="px-3 py-2">{c.counterparty?.name}</td>
-                      <td className="px-3 py-2">{c.type?.name}</td>
+                      <td className="px-3 py-2" title={c.type?.name}>{typeAbbrev(c.type?.name)}</td>
                       <td className="px-3 py-2"><StatusBadge status={c.status} /></td>
                       <td className="px-3 py-2">{ownerName(c.owner_id)}</td>
                       <td className="px-3 py-2 whitespace-nowrap">{fmtMoney(c.value_amount, c.currency)}</td>
