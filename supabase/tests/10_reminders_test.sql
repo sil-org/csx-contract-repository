@@ -53,24 +53,29 @@ select t_eq('124 days out: nothing', t_kinds(date '2026-03-01'), '');
 -- exactly on each lead
 select t_eq('120 days out: planning', t_kinds(date '2026-03-05'), 'notice_120');
 select t_eq('119 days out: still 120 tier (not yet due again)', t_kinds(date '2026-03-06'), 'notice_120');
-select t_eq('60 days out: decision', t_kinds(date '2026-05-04'), 'notice_60');
-select t_eq('14 days out: final', t_kinds(date '2026-06-19'), 'notice_14');
-select t_eq('8 days out: final only', t_kinds(date '2026-06-25'), 'notice_14');
-select t_eq('7 days out: final + escalation', t_kinds(date '2026-06-26'), 'escalation,notice_14');
-select t_eq('on the deadline day: still actionable', t_kinds(date '2026-07-03'), 'escalation,notice_14');
-select t_eq('day after the deadline: passed', t_kinds(date '2026-07-04'), 'passed_deadline');
+-- From 07_notification_requirements.sql on, contract_reminders_due() also returns the new
+-- termination_notice_*/contract_end_notice_* kinds for the SAME contract/dates (same lead-tier
+-- catch-up logic as the old notice_* system, just keyed off two different anchors — the notice
+-- deadline and the expiration date). Expected strings below include them where the math says they
+-- legitimately co-occur; see 60_notification_requirements_test.sql for that logic in isolation.
+select t_eq('60 days out: decision', t_kinds(date '2026-05-04'), 'notice_60,termination_notice_90');
+select t_eq('14 days out: final', t_kinds(date '2026-06-19'), 'contract_end_notice_90,notice_14,termination_notice_30');
+select t_eq('8 days out: final only', t_kinds(date '2026-06-25'), 'contract_end_notice_90,notice_14,termination_notice_30');
+select t_eq('7 days out: final + escalation', t_kinds(date '2026-06-26'), 'contract_end_notice_90,escalation,notice_14,termination_notice_30');
+select t_eq('on the deadline day: still actionable', t_kinds(date '2026-07-03'), 'contract_end_notice_90,escalation,notice_14,termination_notice_30');
+select t_eq('day after the deadline: passed', t_kinds(date '2026-07-04'), 'contract_end_notice_90,passed_deadline');
 
 -- late entry: 32 days out must produce ONE catch-up notice, not 120 + 60
-select t_eq('late entry sends only the latest reached tier', t_kinds(date '2026-06-01'), 'notice_60');
+select t_eq('late entry sends only the latest reached tier', t_kinds(date '2026-06-01'), 'notice_60,termination_notice_90');
 
 -- sent marker suppresses; failed does not
 insert into contract_reminder_log (contract_id, kind, notice_deadline, recipients, status, error)
 values (:'c1', 'notice_60', date '2026-07-03', '{owner@sil.org}', 'failed', 'resend 500');
-select t_eq('failed send is retried next run', t_kinds(date '2026-06-01'), 'notice_60');
+select t_eq('failed send is retried next run', t_kinds(date '2026-06-01'), 'notice_60,termination_notice_90');
 insert into contract_reminder_log (contract_id, kind, notice_deadline, recipients, status)
 values (:'c1', 'notice_60', date '2026-07-03', '{owner@sil.org}', 'sent');
-select t_eq('sent send is not repeated', t_kinds(date '2026-06-01'), '');
-select t_eq('next tier still fires after earlier tier sent', t_kinds(date '2026-06-19'), 'notice_14');
+select t_eq('sent send is not repeated', t_kinds(date '2026-06-01'), 'termination_notice_90');
+select t_eq('next tier still fires after earlier tier sent', t_kinds(date '2026-06-19'), 'contract_end_notice_90,notice_14,termination_notice_30');
 
 -- recipients
 select t_eq('notice goes to owner + backup',
@@ -138,6 +143,6 @@ select t_eq('milestone reminder is sent only once',
 -- admin-configurable lead times (R-R2)
 update contract_settings set value = '[30]' where key = 'reminder_lead_days';
 select t_eq('custom lead times are honoured (30 only)', (select string_agg(kind, ',' order by kind)
-  from contract_reminders_due(date '2027-06-03') where contract_id = :'c1'), 'notice_30');
+  from contract_reminders_due(date '2027-06-03') where contract_id = :'c1'), 'contract_end_notice_90,notice_30,termination_notice_30');
 
 rollback;

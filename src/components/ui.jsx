@@ -35,22 +35,37 @@ export function Card({ title, children, actions, id }) {
 // Jump-links to the id'd Card sections on a long page. Pass every possible
 // section with `show`: only true ones render, so the nav never links to a
 // section that isn't actually on the page. Renders nothing for 0-1 sections.
-export function SectionNav({ items }) {
+// orientation="left": a sticky vertical nav for a flex layout (md+), falling back to the
+// horizontal bar below md. orientation="top" (default): always the horizontal bar.
+export function SectionNav({ items, orientation = 'top' }) {
   const visible = items.filter(i => i.show !== false)
   if (visible.length < 2) return null
-  return (
-    <nav aria-label="Jump to section" className="flex flex-wrap gap-x-4 gap-y-1.5 mb-5 pb-3 border-b border-gray-200 text-sm">
+  const jump = i => e => { e.preventDefault(); document.getElementById(i.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
+
+  const topNav = (
+    <nav aria-label="Jump to section" className={`flex flex-wrap gap-x-4 gap-y-1.5 mb-5 pb-3 border-b border-gray-200 text-sm ${orientation === 'left' ? 'md:hidden' : ''}`}>
       {visible.map(i => (
-        <a
-          key={i.id}
-          href={`#${i.id}`}
-          className="text-gray-500 hover:text-brand hover:underline"
-          onClick={e => { e.preventDefault(); document.getElementById(i.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}
-        >
-          {i.label}
-        </a>
+        <a key={i.id} href={`#${i.id}`} className="text-gray-500 hover:text-brand hover:underline" onClick={jump(i)}>{i.label}</a>
       ))}
     </nav>
+  )
+  if (orientation !== 'left') return topNav
+
+  return (
+    <>
+      {topNav}
+      <nav aria-label="Jump to section" className="hidden md:block w-44 flex-shrink-0 sticky top-8 self-start text-sm">
+        <ul className="space-y-1.5 border-l border-gray-200">
+          {visible.map(i => (
+            <li key={i.id}>
+              <a href={`#${i.id}`} className="block pl-3 -ml-px border-l-2 border-transparent text-gray-500 hover:text-brand hover:border-brand transition-colors py-0.5" onClick={jump(i)}>
+                {i.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    </>
   )
 }
 
