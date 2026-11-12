@@ -23,7 +23,7 @@ const APP_ORIGIN = Deno.env.get('CONTRACTS_APP_ORIGIN') ?? 'https://contracts.si
 interface Due {
   contract_id: string; milestone_id: string | null; kind: string; notice_deadline: string | null
   due_on: string; days_left: number; title: string; counterparty: string; owner_name: string
-  to_emails: string[]
+  to_emails: string[]; missing_fields: string[] | null
 }
 
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
@@ -42,6 +42,24 @@ function compose(r: Due): { subject: string; html: string } {
   if (r.kind === 'milestone') {
     subject = `Milestone due in ${plural(r.days_left)}: ${r.title}`
     body = `<p>A milestone on ${what} is due <strong>${fmt(r.due_on)}</strong> (${plural(r.days_left)}).</p>` + btn(link, 'Open contract')
+  } else if (r.kind.startsWith('termination_notice_')) {
+    subject = `Termination notice deadline in ${plural(r.days_left)}: ${r.title}`
+    body = `<p>The notice deadline for ${what} is <strong>${fmt(r.due_on)}</strong> — ${plural(r.days_left)} away. If no action is taken by then, this contract may renew or terminate automatically.</p>` + btn(link, 'Open contract')
+  } else if (r.kind.startsWith('contract_end_notice_')) {
+    subject = `Contract end date in ${plural(r.days_left)}: ${r.title}`
+    body = `<p>${what} is set to end on <strong>${fmt(r.due_on)}</strong> — ${plural(r.days_left)} away.</p>` + btn(link, 'Open contract')
+  } else if (r.kind === 'missing_data_update' || r.kind === 'missing_data_escalation') {
+    const escalated = r.kind === 'missing_data_escalation'
+    subject = `${escalated ? 'ESCALATION — ' : ''}Missing information: ${r.title}`
+    const list = (r.missing_fields ?? []).map(f => `<li>${esc(f)}</li>`).join('')
+    body = `<p>${what}${escalated ? ' is still' : ' is'} missing the following information${escalated ? ', first flagged over a month ago' : ''}:</p>
+            <ul>${list}</ul>
+            <p><strong>Next action:</strong> add the missing information to the contract record.</p>` + btn(link, 'Open contract')
+  } else if (r.kind === 'termination_date_update' || r.kind === 'termination_date_escalation') {
+    const escalated = r.kind === 'termination_date_escalation'
+    subject = `${escalated ? 'ESCALATION — ' : ''}Confirm what happened: ${r.title}`
+    body = `<p>${what} had a contract end date of <strong>${fmt(r.due_on)}</strong>, which has passed, and no termination date has been recorded.</p>
+            <p><strong>Next action:</strong> confirm whether this contract was renewed, terminated or allowed to lapse, and record the termination date (if any) on the contract record.</p>` + btn(link, 'Open contract')
   } else if (r.kind === 'escalation') {
     subject = `ESCALATION — no decision yet: ${r.title} (notice due ${fmt(r.due_on)})`
     body = `<p>The notice deadline for ${what} is <strong>${fmt(r.due_on)}</strong> — ${plural(r.days_left)} away — and no decision has been recorded by the contract owner, ${esc(r.owner_name)}.</p>${actions}` + btn(decide, 'Record a decision')

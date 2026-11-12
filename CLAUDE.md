@@ -59,10 +59,45 @@ keep the positive-control checks, and for a new rule, break it on purpose once t
 ## State as of 2026-10-08 (update this section as things change)
 - Live: app on Amplify, migrations 01–03 + 02 run, Edge Functions deployed, daily reminder job scheduled,
   license-manager `send-email` fix merged (PR #22) and tested by a real email.
-- **Branch `ccr-0927e7de-2f6zv7` has unmerged work:** migration `04_sheet_fields.sql` (+ form/detail fields,
-  `CLAUDE.md`, `tests/ui/`), migration `05_original_exception.sql` — the admin-only "original not on
-  file" exception (see below) — and now migration `06_signatory_and_custom_msa.sql`. All three have to be
-  run in Supabase before merging.
+- Migrations 01–06 are merged to `main` (the `ccr-0927e7de-2f6zv7` branch noted here earlier is in; this
+  line was stale — corrected 2026-11-11).
+- **Branch `notification-requirements` has unmerged work (2026-11-11):** migration
+  `07_notification_requirements.sql` — six new reminder categories from the business's notification
+  requirements table, on top of the existing owner/backup notice-deadline cycle:
+  1. **Termination notice approaching** (90/30 days before the computed notice deadline) and
+  2. **Contract end date approaching** (90/30 days before the end date) — both to the signatory +
+     department manager, admin-configurable lead times.
+  3. **Missing-data update** (14 days after the record is added, repeating every 14 days while any
+     required field is blank) and
+  4. **Missing-data escalation** (30 days, repeating monthly) — (3) to the signatory + department
+     manager, (4) to named individuals (e.g. Sheryl Nelson / Mike Painter) via the new
+     `missing_data_escalation_emails` setting — empty by default, so it won't send until an admin sets it.
+     "Missing" covers the business's data-element list (system name, cost, mission justification,
+     signatory/dept-mgr name+email, contract length, effective/signed/end dates); `termination_date`,
+     `amended_date` and `amendment_description` are explicitly exempt (and are new fields themselves —
+     the business's exemption list named them, but they didn't exist in the schema yet).
+  5. **Termination-date update** (fires the day the end date passes, repeating every 2 weeks) and
+  6. **Termination-date escalation** (fires 31+ days past the end date, repeating monthly) — both
+     condition on a contract having passed its end date with the new manual `termination_date` field
+     still unrecorded; (6) goes to named individuals (e.g. CFO/CTO) via `termination_escalation_emails`,
+     same empty-by-default pattern as (4).
+  Applies to `draft` and `active` contracts (not terminated/expired/superseded/completed), per the
+  business: missing-data nagging should start as soon as a record is added. All six are configurable on
+  the admin Settings page (lead times, intervals, and the two escalation recipient lists). Covered by
+  `supabase/tests/60_notification_requirements_test.sql` — the full SQL suite (this machine has no
+  native PostgreSQL binaries, so it was run via a disposable `postgres:16-alpine` Docker container
+  instead of `run.sh`'s normal `initdb`/`pg_ctl` path) passes, 2026-11-12. That run also surfaced two
+  issues the suite had never actually caught before (no local Postgres/Docker had been available until
+  now): `10_reminders_test.sql`'s fixed expectations didn't account for the new termination/end-date
+  notices now legitimately co-firing alongside the old notice tiers on several of its test dates (fixed
+  — not a migration bug, just un-updated assertions); and `50_signatory_custom_msa_test.sql` had a
+  latent, pre-existing bug unrelated to this branch (its custom-MSA activation test never attached an
+  executed original either, so `contracts_guard()`'s original-on-file check fired first instead of the
+  MSA check it meant to test — fixed by attaching one). Migration 07 must still be run against the real
+  Supabase project before merging the app change that depends on it.
+  Also in this branch: the contract detail page's section nav is now a sticky left sidebar (`md:` and up;
+  falls back to the horizontal bar on narrow screens) instead of a horizontal bar at the top
+  (`SectionNav` in `src/components/ui.jsx` gained an `orientation` prop).
 - **Built (2026-11-09):** the S3 bucket (`sil-contract-repository`, `us-east-1`) is created — Object Lock +
   versioning on, public access blocked, SSE-S3 encryption, governance-mode 7-year placeholder retention, CORS
   for `contracts.sil.org` / `localhost:5173` / the Amplify preview URL. The AWS/CORS secret names are now

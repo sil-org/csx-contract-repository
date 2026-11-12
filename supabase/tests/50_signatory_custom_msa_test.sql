@@ -75,6 +75,13 @@ do $$ begin
 end $$;
 
 -- ── positive control: custom_msa blocks activation without an attached MSA copy ──
+-- Attach the executed original first, so the only thing standing between this contract and
+-- Active is the missing MSA copy -- otherwise contracts_guard()'s original-on-file check (checked
+-- first) fires instead, and this test would be checking the wrong rule.
+insert into contract_documents (contract_id, doc_key, version, role, filename, content_type, size_bytes,
+                                sha256, s3_key, s3_version_id, change_note)
+values (current_setting('t.c')::uuid, gen_random_uuid(), 1, 'original', 'acme-original.pdf', 'application/pdf', 10,
+        repeat('b', 64), 'k/orig-' || current_setting('t.c'), 'v1', 'initial');
 select t_denied('cannot activate a custom-MSA contract without an attached MSA copy', :'dana',
   format($q$update contracts set status='active', effective_date=date '2026-01-01', signed_date=date '2025-12-01',
             expiration_date=date '2027-01-01' where id = %L$q$, current_setting('t.c')), 'custom MSA');

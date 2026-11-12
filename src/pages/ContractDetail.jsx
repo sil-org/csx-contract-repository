@@ -86,7 +86,9 @@ export default function ContractDetail() {
         )}
       </div>
 
-      <SectionNav items={navItems} />
+      <div className="md:flex md:gap-8 md:items-start">
+        <SectionNav items={navItems} orientation="left" />
+        <div className="flex-1 min-w-0">
 
       <DecisionPanel contract={c} canEdit={canEdit} directory={directory} profileId={profile?.id} autoOpen={!!params.get('decide')} />
 
@@ -127,6 +129,10 @@ export default function ContractDetail() {
           <Row label="Notice terms">{c.notice_terms}</Row>
           <Row label="Last day to cancel">{c.notice_deadline && <strong>{fmtDate(c.notice_deadline)}</strong>}</Row>
           <Row label="Termination for convenience">{c.termination_for_convenience == null ? null : c.termination_for_convenience ? `Yes${c.termination_notice_days != null ? ` · ${c.termination_notice_days} days' notice` : ''}` : 'No'}</Row>
+          <Row label="Termination date">{c.termination_date ? fmtDate(c.termination_date)
+            : (c.expiration_date && c.expiration_date < new Date().toISOString().slice(0, 10) && !c.evergreen
+                ? <span className="text-amber-700">Not yet recorded — end date has passed</span> : null)}</Row>
+          <Row label="Amended">{c.amended_date && `${fmtDate(c.amended_date)}${c.amendment_description ? ` · ${c.amendment_description}` : ''}`}{!c.amended_date && c.amendment_description}</Row>
         </dl>
       </Card>
 
@@ -167,6 +173,8 @@ export default function ContractDetail() {
       <AccessPanel contract={c} canEdit={canEdit} directory={directory} profileId={profile?.id} />
       <RelationshipsPanel contract={c} allContracts={all} onVisible={setVisible('relationships')} />
       {can.seeAudit && <HistoryPanel contract={c} directory={directory} />}
+        </div>
+      </div>
     </Page>
   )
 }

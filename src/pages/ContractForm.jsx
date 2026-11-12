@@ -20,6 +20,8 @@ const EMPTY = {
   no_original_exception: false, no_original_reason: '',
   // New data-element list (2026-11-09)
   contract_length_years: '', custom_msa: false,
+  // Notification requirements (2026-11-11)
+  termination_date: '', amended_date: '', amendment_description: '',
 }
 
 const nz = v => (v === '' || v === undefined ? null : (typeof v === 'string' ? (v.trim() === '' ? null : v.trim()) : v))
@@ -96,6 +98,8 @@ export default function ContractForm() {
         pricing_info: nz(form.pricing_info), vendor_contact_note: nz(form.vendor_contact_note),
         contract_length_years: nz(form.contract_length_years) === null ? null : Number(form.contract_length_years),
         custom_msa: form.custom_msa,
+        termination_date: nz(form.termination_date), amended_date: nz(form.amended_date),
+        amendment_description: nz(form.amendment_description),
         ...(id ? { status: form.status } : {}),
         // Only admins may grant/revoke this (enforced in the DB too); leaving these out of
         // the payload for non-admins keeps their edits from touching an existing exception.
@@ -212,6 +216,7 @@ export default function ContractForm() {
               </select>
             </Field>
             {form.termination_for_convenience === 'true' && <Field label="Termination notice (days)">{text('termination_notice_days', { type: 'number', min: 0 })}</Field>}
+            <Field label="Termination date" hint="What actually happened: when this contract was confirmed terminated or not renewed. Leave blank until that's decided.">{text('termination_date', { type: 'date' })}</Field>
             <label className="flex items-center gap-2 text-sm md:col-span-3">
               <input type="checkbox" checked={form.reminders_enabled} onChange={e => set('reminders_enabled', e.target.checked)} /> Send reminders for this contract
             </label>
@@ -317,6 +322,8 @@ export default function ContractForm() {
             {kind === 'other' && <Field label="Parent agreement"><select className={inputCls} value={form.parent_id} onChange={e => set('parent_id', e.target.value)}><option value="">None</option>{contractOpts}</select></Field>}
             <Field label="This is an amendment to" hint="Links to the contract it amends."><select className={inputCls} value={form.amends_id} onChange={e => set('amends_id', e.target.value)}><option value="">Not an amendment</option>{contractOpts}</select></Field>
             <Field label="Superseded by"><select className={inputCls} value={form.superseded_by_id} onChange={e => set('superseded_by_id', e.target.value)}><option value="">Not superseded</option>{contractOpts}</select></Field>
+            <Field label="Amended date">{text('amended_date', { type: 'date' })}</Field>
+            <Field label="Amendment description" className="md:col-span-2">{text('amendment_description')}</Field>
           </div>
           <p className="text-xs font-semibold text-gray-600 mb-2">Provisions present (optional)</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
