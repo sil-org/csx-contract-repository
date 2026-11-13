@@ -20,7 +20,7 @@ const DEFAULT_STATUSES = ['active', 'draft']
 const ALL_SENTINEL = '__all__'
 const FILTERS_COLLAPSE_KEY = 'contracts.filtersCollapsed'
 
-// Filter/sort by type, status, counterparty, owner, department, tag, text, value, and date ranges (R-S1/R-S2 metadata).
+// Filter/sort by type, status, vendor, owner, department, tag, text, value, and date ranges (R-S1/R-S2 metadata).
 export default function Contracts() {
   const can = useCan()
   const [params, setParams] = useSearchParams()
@@ -165,7 +165,7 @@ export default function Contracts() {
 
           {!filtersCollapsed && (
             <>
-              <FilterField label="Search"><input className={inputCls} placeholder="Title, counterparty, tag…" value={f.q} onChange={e => set('q', e.target.value)} /></FilterField>
+              <FilterField label="Search"><input className={inputCls} placeholder="Title, vendor, tag…" value={f.q} onChange={e => set('q', e.target.value)} /></FilterField>
               <FilterField label="Type">
                 <MultiSelect value={f.type} onChange={arr => setMulti('type', arr)} placeholder="All types"
                   options={(state.types || []).map(t => ({ value: t.id, label: t.name }))} />
@@ -215,7 +215,7 @@ export default function Contracts() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 text-gray-600"><tr>
-                  <Th k="title">Title</Th><Th k="counterparty">Counterparty</Th><Th k="type">Type</Th><Th k="status">Status</Th>
+                  <Th k="title">Title</Th><Th k="counterparty">Vendor</Th><Th k="type">Type</Th><Th k="status">Status</Th>
                   <Th k="owner">Owner</Th><Th k="value">Value</Th><Th k="signed">Signed</Th><Th k="renewed">Last renewal</Th>
                   <Th k="notice">Notice deadline</Th><Th k="expires">Expires</Th>
                 </tr></thead>

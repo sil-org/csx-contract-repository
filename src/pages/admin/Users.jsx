@@ -3,6 +3,7 @@ import { UserPlus, Search } from 'lucide-react'
 import { listAdminUsers, searchProfiles, setUserRole } from '../../lib/contracts'
 import { ROLE_LABELS } from '../../lib/format'
 import { Page, Card, ErrorMsg, Loading, inputCls } from '../../components/ui'
+import AdminTabs from '../../components/AdminTabs'
 import { useAuth } from '../../context/AuthContext'
 
 const DESCRIPTIONS = {
@@ -34,7 +35,7 @@ export default function AdminUsers() {
   const users = (state.users || []).filter(u => !filter || `${u.display_name} ${u.primary_email}`.toLowerCase().includes(filter.toLowerCase()))
 
   return (
-    <Page title="Users & roles">
+    <Page title="Users & roles" tabs={<AdminTabs />}>
       <ErrorMsg error={state.error || err} />
       <AddPerson onAdded={load} grantedBy={profile?.id} setErr={setErr} />
 

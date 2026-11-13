@@ -22,13 +22,13 @@ with ins as (
   insert into contracts (title, system_name, type_id, counterparty_id, owner_id, department, department_manager,
       annual_amount, annual_amount_note, mission_justification, initial_contract_date, signatory_name,
       notice_period_days, notice_terms, last_renewal_date, expiration_date, administrators, corporate_license,
-      google_sso, pricing_info, vendor_contact_note, notes)
+      sign_on_methods, pricing_info, vendor_contact_note, notes)
   values ('Freshworks CRM', 'Freshworks CRM (Customer Relationship Management)',
       (select id from contract_types where name = 'Software subscription / system'),
       '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a2', 'GRO', 'Roy Eyre',
       35000, 'quoted as $35k', 'Donors are critical to our mission.', date '2020-11-06', 'Sheryl Howe',
       60, '60 days', date '2025-11-10', date '2026-11-10', 'crm-admin@sil.org', true,
-      false, 'See most recent pricing', 'Do not contact the vendor without speaking to the department manager.',
+      array['saml'], 'See most recent pricing', 'Do not contact the vendor without speaking to the department manager.',
       'https://drive.google.com/open?id=17jQN')
   returning id)
 insert into made select id from ins;
@@ -39,12 +39,19 @@ select t_eq('last day to cancel matches the sheet (11/10/2026 - 60 days = 9/11/2
   (select notice_deadline from contracts where title = 'Freshworks CRM'), date '2026-09-11');
 select t_eq('annual amount stored as a number', (select annual_amount from contracts where title = 'Freshworks CRM'), 35000.00::numeric);
 select t_eq('annual cost "in thousands" is derivable', (select (annual_amount / 1000)::int from contracts where title = 'Freshworks CRM'), 35);
-select t_eq('yes / no answers are stored', (select (corporate_license, google_sso)::text from contracts where title = 'Freshworks CRM'), '(t,f)');
+select t_eq('corporate license yes / sign-on methods stored', (select (corporate_license, sign_on_methods)::text from contracts where title = 'Freshworks CRM'), '(t,{saml})');
 
 insert into contracts (title, type_id, counterparty_id, owner_id, department)
 select 'Unknowns', (select id from contract_types limit 1), '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a2', 'GTIS';
-select t_eq('corporate license / Google login default to unknown (null), not "no"',
-  (select (corporate_license is null and google_sso is null) from contracts where title = 'Unknowns'), true);
+select t_eq('corporate license defaults to unknown (null), not "no"; sign-on methods default to empty, not null',
+  (select (corporate_license is null and sign_on_methods = '{}') from contracts where title = 'Unknowns'), true);
+
+do $$ begin
+  begin
+    update contracts set sign_on_methods = array['carrier_pigeon'] where title = 'Unknowns';
+    raise exception 'FAIL [unrecognized sign-on method accepted]';
+  exception when check_violation then raise notice 'ok   an unrecognized sign-on method is rejected'; end;
+end $$;
 
 do $$ begin
   begin

@@ -6,6 +6,7 @@ import { fmtDate, fmtDateTime, fmtBytes, daysUntil, DOC_ROLE_LABELS, DECISION_LA
 import {
   listLinks, addLink, deleteLink, listMilestones, addMilestone, setMilestoneDone, deleteMilestone,
   listDecisions, recordDecision, listAccess, grantAccess, revokeAccess, listAudit, listRelated,
+  listSignatories, addSignatory, deleteSignatory,
 } from '../../lib/contracts'
 import { listDocuments, uploadDocument, openDocument, ALLOWED_TYPES } from '../../lib/documents'
 
@@ -255,26 +256,76 @@ export function AccessPanel({ contract, canEdit, directory, profileId }) {
   )
 }
 
+// ── Signatory history ─────────────────────────────────────────────────────────
+// contracts.signatory_name/signatory_email are a synced cache of whichever row here has the
+// latest start_date on or before today (09_responsible_party_history.sql) -- add a dated entry
+// here to change the signatory, rather than treating the current fields as directly editable.
+export function SignatoriesPanel({ contract, canEdit, profileId, onVisible }) {
+  const [{ data: items, error }, reload] = useLoad(() => listSignatories(contract.id), [contract.id])
+  const [form, setForm] = useState({ name: '', email: '', start_date: '', note: '' })
+  const [err, setErr] = useState(null)
+  const act = fn => async (...a) => { setErr(null); try { await fn(...a); reload() } catch (x) { setErr(x) } }
+  const visible = canEdit || !!items?.length
+  useEffect(() => { onVisible?.(visible) }, [visible]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (!visible) return null
+
+  const today = new Date().toISOString().slice(0, 10)
+  const currentId = items?.filter(s => s.start_date <= today).sort((a, b) => b.start_date.localeCompare(a.start_date) || b.created_at.localeCompare(a.created_at))[0]?.id
+
+  return (
+    <Card title="Signatory history" id="signatories">
+      <ErrorMsg error={error || err} />
+      <p className="text-xs text-gray-500 mb-2">Who's responsible for signing can change over a long-running contract. The most recent entry on or before today is the current signatory shown elsewhere on this record.</p>
+      <ul className="divide-y divide-gray-100 mb-2">
+        {items?.map(s => (
+          <li key={s.id} className="py-2 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="font-medium">{s.name}</span>
+              {s.id === currentId && <span className="text-[11px] font-semibold text-green-800 bg-green-50 rounded px-1.5 py-0.5">Current</span>}
+              <span className="text-gray-400 ml-auto">{fmtDate(s.start_date)}</span>
+              {canEdit && <button className="text-gray-400 hover:text-red-600" aria-label="Remove entry" onClick={act(deleteSignatory).bind(null, s.id)}><Trash2 size={14} /></button>}
+            </div>
+            {s.email && <div className="text-xs text-gray-500">{s.email}</div>}
+            {s.note && <div className="text-xs text-gray-500 italic">“{s.note}”</div>}
+          </li>
+        ))}
+        {items && !items.length && <li className="py-2 text-sm text-gray-400">None yet.</li>}
+      </ul>
+      {canEdit && (
+        <form className="grid md:grid-cols-2 gap-3" onSubmit={async e => {
+          e.preventDefault()
+          await act(addSignatory)(contract.id, form, profileId)
+          setForm({ name: '', email: '', start_date: '', note: '' })
+        }}>
+          <Field label="Name" required><input className={inputCls} required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></Field>
+          <Field label="Email"><input type="email" className={inputCls} value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></Field>
+          <Field label="Effective from" required hint="The date this person became (or becomes) the signatory.">
+            <input type="date" required className={inputCls} value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} />
+          </Field>
+          <Field label="Note" hint="e.g. “New hire, replacing Jo after the 2027 renewal.”"><input className={inputCls} value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} /></Field>
+          <div className="md:col-span-2"><button className={btnSecondary}>Add entry</button></div>
+        </form>
+      )}
+    </Card>
+  )
+}
+
 // ── Relationships ────────────────────────────────────────────────────────────
 export function RelationshipsPanel({ contract, allContracts, onVisible }) {
   const [{ data: related }] = useLoad(() => listRelated(contract.id), [contract.id])
   const byId = id => allContracts.find(c => c.id === id)
-  const parent = contract.parent_id && byId(contract.parent_id)
   const amends = contract.amends_id && byId(contract.amends_id)
   const supers = contract.superseded_by_id && byId(contract.superseded_by_id)
-  const children = (related || []).filter(r => r.parent_id === contract.id)
   const amendments = (related || []).filter(r => r.amends_id === contract.id)
-  const visible = !!(parent || amends || supers || children.length || amendments.length)
+  const visible = !!(amends || supers || amendments.length)
   useEffect(() => { onVisible?.(visible) }, [visible]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!visible) return null
   const L = c => <Link className="text-brand hover:underline" to={`/contracts/${c.id}`}>{c.title}</Link>
   return (
     <Card title="Related contracts" id="relationships">
       <ul className="text-sm space-y-1">
-        {parent && <li>Parent agreement: {L(parent)}</li>}
         {amends && <li>Amends: {L(amends)}</li>}
         {supers && <li>Superseded by: {L(supers)}</li>}
-        {children.length > 0 && <li>Child agreements: {children.map((c, i) => <span key={c.id}>{i > 0 && ', '}{L(c)}</span>)}</li>}
         {amendments.length > 0 && <li>Amendments: {amendments.map((c, i) => <span key={c.id}>{i > 0 && ', '}{L(c)}</span>)}</li>}
       </ul>
     </Card>

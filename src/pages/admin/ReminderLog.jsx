@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { listReminderLog } from '../../lib/contracts'
 import { fmtDateTime, fmtDate } from '../../lib/format'
 import { Page, ErrorMsg, Loading } from '../../components/ui'
+import AdminTabs from '../../components/AdminTabs'
 
 const KIND = k => k === 'escalation' ? 'Escalation' : k === 'passed_deadline' ? 'Passed deadline' : k === 'milestone' ? 'Milestone' : `${k.replace('notice_', '')}-day notice`
 
@@ -12,7 +13,7 @@ export default function ReminderLog() {
   useEffect(() => { listReminderLog().then(rows => setState({ loading: false, rows })).catch(error => setState({ loading: false, error })) }, [])
   const failed = state.rows?.filter(r => r.status === 'failed').length || 0
   return (
-    <Page wide title="Reminder log">
+    <Page wide title="Reminder log" tabs={<AdminTabs />}>
       <ErrorMsg error={state.error} />
       {failed > 0 && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 mb-3">{failed} failed send{failed === 1 ? '' : 's'} in this list. They are retried automatically on the next daily run.</div>}
       {state.loading ? <Loading /> : (

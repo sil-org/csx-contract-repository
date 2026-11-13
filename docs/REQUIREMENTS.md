@@ -74,15 +74,13 @@ Define fields **before** bulk entry; inconsistent classification is hard to fix 
 |---|---|---|
 | Title | Yes | |
 | Contract type | Yes | MOU / SOW / Vendor / Other |
-| Counterparty (name) | Yes | Use a shared counterparty list to avoid duplicates |
+| Vendor (name) | Yes | Use a shared vendor list to avoid duplicates |
 | Internal owner / backup owner | Yes | |
 | Department / program | Yes | |
 | Status | Yes | Draft, Active, Expired, Terminated, Superseded, Completed |
 | Effective date | Yes | |
 | Expiration / end date | Yes (or "evergreen") | |
-| Binding status | Yes | Non-binding / Partly binding / Binding |
 | Signed date | Yes | |
-| Governing law / jurisdiction | No | |
 | Confidentiality / sensitivity | Yes | Standard / Restricted |
 | Tags | No | Free-form, with suggested vocabulary |
 | Notes | No | |
@@ -100,14 +98,13 @@ Define fields **before** bulk entry; inconsistent classification is hard to fix 
 Contract value, currency, payment terms, billing frequency, budget code / cost center.
 
 ### 4.4 Relationships
-- **R-M1** An SOW can reference a **parent agreement** (MSA). View a parent and see all child SOWs.
 - **R-M2** Amendments link to the contract they amend; the record shows the current effective terms and the amendment history.
 - **R-M3** Contracts can be marked **Superseded by** another contract.
 
 ### 4.5 Type-specific fields
 - **MOU:** expected next step (e.g., definitive agreement), target date, list of binding clauses (confidentiality, exclusivity), purpose.
-- **SOW:** project name, deliverables summary, milestones (date + description), parent MSA.
-- **Vendor:** vendor contact, SLA summary, insurance/compliance certificate expiry, data-protection terms present (Y/N).
+- **SOW:** project name, deliverables summary, milestones (date + description).
+- **Vendor:** vendor contact.
 
 ### 4.6 Provisions checklist (optional)
 Yes/No flags: confidentiality, auto-renewal, assignment consent, indemnification, limitation of liability, data protection, termination for convenience, non-solicit.
@@ -136,7 +133,7 @@ Yes/No flags: confidentiality, auto-renewal, assignment consent, indemnification
 
 ## 6. Search, browse, reporting
 
-- **R-S1** Filter/sort by type, status, counterparty, owner, department, tag, date ranges, and value.
+- **R-S1** Filter/sort by type, status, vendor, owner, department, tag, date ranges, and value.
 - **R-S2** Keyword search across metadata; full-text search of PDF contents (OCR for scanned PDFs is a stretch goal).
 - **R-S3** Saved views (e.g., "My contracts expiring in 90 days").
 - **R-S4** CSV export of the filtered list (permission-controlled and logged).

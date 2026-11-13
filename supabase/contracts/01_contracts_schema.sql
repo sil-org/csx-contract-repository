@@ -141,7 +141,14 @@ create table if not exists contracts (
 create index if not exists contracts_owner_idx          on contracts (owner_id);
 create index if not exists contracts_status_idx         on contracts (status);
 create index if not exists contracts_notice_deadline_idx on contracts (notice_deadline) where status = 'active';
-create index if not exists contracts_parent_idx         on contracts (parent_id);
+-- Guarded (rather than a plain `create index if not exists`): migration 08 drops parent_id,
+-- so this stays safe to re-run by hand even after 08 has run.
+do $$ begin
+  if exists (select 1 from information_schema.columns
+             where table_name = 'contracts' and column_name = 'parent_id') then
+    execute 'create index if not exists contracts_parent_idx on contracts (parent_id)';
+  end if;
+end $$;
 
 -- Named users who may see a Restricted contract (R-U3).
 create table if not exists contract_access (

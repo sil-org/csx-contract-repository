@@ -18,6 +18,7 @@ const sent: Record<string, any>[] = []; const logs: Record<string, any>[] = []; 
 let flaky = true   // first send-email call for 'Beta' fails, retry succeeds; Gamma always fails
 globalThis.fetch = async (input: string | URL | Request, init?: RequestInit) => {
   const req = new Request(input, init); const url = new URL(req.url)
+  if (url.pathname === '/rest/v1/rpc/contract_resync_signatories') return Response.json(null)
   if (url.pathname === '/rest/v1/rpc/contract_reminders_due') return Response.json(due)
   if (url.pathname === '/rest/v1/contract_reminder_log') { logs.push(await req.json()); return new Response(null, { status: 201 }) }
   if (url.pathname === '/functions/v1/send-email') {

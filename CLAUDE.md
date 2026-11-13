@@ -93,8 +93,8 @@ keep the positive-control checks, and for a new rule, break it on purpose once t
   — not a migration bug, just un-updated assertions); and `50_signatory_custom_msa_test.sql` had a
   latent, pre-existing bug unrelated to this branch (its custom-MSA activation test never attached an
   executed original either, so `contracts_guard()`'s original-on-file check fired first instead of the
-  MSA check it meant to test — fixed by attaching one). Migration 07 must still be run against the real
-  Supabase project before merging the app change that depends on it.
+  MSA check it meant to test — fixed by attaching one). **Migration 07 has been run against the real
+  Supabase project (2026-11-12).**
   Also in this branch: the contract detail page's section nav is now a sticky left sidebar (`md:` and up;
   falls back to the horizontal bar on narrow screens) instead of a horizontal bar at the top
   (`SectionNav` in `src/components/ui.jsx` gained an `orientation` prop).
@@ -123,6 +123,79 @@ keep the positive-control checks, and for a new rule, break it on purpose once t
   `contracts_guard()`, same shape as the executed-original rule). Department stayed free text with
   autocomplete (no fixed department list was available to seed a lookup table). Covered by
   `supabase/tests/50_signatory_custom_msa_test.sql`.
+- **Built (2026-11-12):** field cleanup from colleague feedback on the form — `08_field_cleanup.sql`:
+  - Dropped entirely (column + UI): `governing_law`, `binding_status` (the `contract_binding` enum type is
+    left in place, unused), and `parent_id` — the SOW→MSA "Parent agreement" linking feature. `custom_msa` +
+    an attached `msa` document (migration 06) already cover that need; `amends_id`/`superseded_by_id` and the
+    Related Contracts panel are untouched.
+  - `google_sso` (yes/no/unknown) → `sign_on_methods` (`text[]`, checked against `google`/`saml`/`local`):
+    a vendor can use more than one, and "unknown" is no longer representable — old `true` became `['google']`,
+    `false`/`null` became `'{}'`. UI is now a checkbox group, not a select.
+  - Three vendor-detail keys that only ever lived in the `details` jsonb (no column) — `sla_summary`,
+    `insurance_expiry`, `data_protection_terms` — are gone from the form/detail page and wiped from existing
+    rows' `details`.
+  - "Counterparty" relabeled to **Vendor** everywhere in the UI (list column/filter/search, the contract form) —
+    the business already calls it that (see the migration 06 note above); the `contract_counterparties` table/
+    `counterparty_id` column keep their names.
+  - Made required on the contract form: initial contract date, signatory name/email, signed date, effective
+    date, expiration date (unless evergreen), contract length, notice period, annual amount, and the mission
+    field (relabeled **"Rationale: Why this software advances our mission"**, common terminology with
+    leadership) — client-side only (`required` attributes), no new DB constraints.
+  - `supabase/tests/30_sheet_fields_test.sql` updated for `sign_on_methods`; `supabase/seed/test_contracts.sql`
+    and both `tests/ui/*.mjs` scripts updated to match. `01_contracts_schema.sql`'s `contracts_parent_idx`
+    creation had to be guarded (it unconditionally referenced the now-dropped `parent_id`, which broke that
+    file's by-hand re-runnability once 08 has run) — the only edit made to an already-run migration file, and
+    it stays a no-op change for anyone who already ran 01.
+  - Verified end-to-end this session (no local PostgreSQL on this machine, so via a disposable
+    `postgres:16-alpine` Docker container, same approach as 2026-11-12's notification-requirements run): all
+    migrations 01→08 run clean twice in a row in order (matching `run.sh`'s own double-run check), the full
+    `supabase/tests/*_test.sql` suite passes, `npm run build` succeeds, and both `tests/ui/pages.mjs` and
+    `tests/ui/sheet_fields.mjs` pass against a local Vite dev server (one pre-existing, unrelated failure in
+    `pages.mjs` — the `?decide=1` deep link — reproduces identically on the pre-change code, so it's not new).
+    **Migrations 07 and 08 have both been run against the real Supabase project (2026-11-12).** The app
+    changes on this branch can now be merged without a migration-ordering gap.
+- **Built (2026-11-12):** signatory history — `09_responsible_party_history.sql`. The user flagged that
+  for a long-running contract, the original signatory shown next to "Initial contract date" is often not
+  who's responsible now; decided with the user:
+  - Scope is the **signatory only** (not `department_manager`, which stays a single current field).
+  - New `contract_signatories` table: `contract_id`, `name`, `email`, `start_date` ("effective as of"),
+    `note`, `created_by`/`created_at`. Editable/deletable by anyone who can edit the contract (same as
+    milestones/links), not append-only like documents. Audited like every other contract child table.
+  - "Current" = whichever row's `start_date` is the latest one on or before today (ties broken by
+    `created_at`). `contracts.signatory_name`/`signatory_email` stay as a **synced cache** of that row —
+    kept current by a trigger on inserts/updates/deletes — so `contract_missing_attrs()` and the reminder
+    queries in `07_notification_requirements.sql` needed **no changes at all**.
+  - A future-dated entry can't retroactively flip the cache at write time; `contract_resync_signatories()`
+    catches that once a day (called from `contract-reminders`, right before `contract_reminders_due()` —
+    best-effort, a failure there doesn't block real reminders from sending).
+  - Backfills a Day-1 history row for every contract that already has a `signatory_name` (dated to its
+    initial contract date, else effective date, else when the record was added).
+  - UI: new "Signatory history" panel on the contract detail page (`SignatoriesPanel` in
+    `src/components/contract/panels.jsx`), listing entries with a "Current" badge and an add-entry form.
+    The contract form's Signatory name/email fields are now **editable only when creating** a contract
+    (seed the first history row on save); once a contract exists they're disabled, with a hint pointing
+    at the history panel — editing them directly would silently fight with whatever the history table
+    computes as current. The detail page's "Initial contract date" and "Current signatory" are now two
+    separate rows (previously shown together as "`date` · signed by `name`", which is exactly the
+    confusion that prompted this).
+  - Covered by new `supabase/tests/70_signatory_history_test.sql` (current-row selection, the future-
+    dated-entry and same-date tie-break edge cases, the missing-data check still firing once there's no
+    current entry, RLS, and the audit trail). `supabase/tests/run.sh` and the two `tests/ui/*.mjs` scripts
+    updated to match; the Edge Function e2e test's mock fetch handles the new resync RPC call (not run
+    itself this session — no Deno on this machine — but it's a small, low-risk addition reviewed by hand).
+  - Verified the same way as 08 above (disposable `postgres:16-alpine` container): migrations 01→09 run
+    clean twice in a row, the full SQL suite passes, `npm run build` succeeds, and
+    `tests/ui/{pages,sheet_fields,users}.mjs` all pass (same one pre-existing `pages.mjs` failure as noted
+    above, still unrelated). **Migration 09 has been run against the real Supabase project (2026-11-13;
+    this line previously said otherwise — corrected 2026-11-13).**
+- **Built (2026-11-13):** the sidebar's nested Admin submenu could never be opened by click while the
+  sidebar was collapsed (the heading had no route to navigate to, and the expand-toggle was disabled
+  while collapsed). Replaced with a single `/admin` sidebar link plus a horizontal `AdminTabs` bar
+  (`src/components/AdminTabs.jsx`) on each admin page, matching license-manager's `/admin` layout —
+  `Page` in `src/components/ui.jsx` gained a `tabs` prop rendered above the title. `/admin` itself
+  redirects admins to `/admin/settings` and auditors (who can't see Settings) to `/admin/audit`, so
+  auditors don't get bounced out of the admin area entirely. Covered by two new cases in
+  `tests/ui/pages.mjs`.
 - **Open decision:** whether the sheet's "Other Systems" tab (many rows with no contract) is imported, and as
   what — on hold (2026-10-08), revisit later.
 - **Planned, not built:** import of the existing tracking sheet (it is confidential — don't commit it);

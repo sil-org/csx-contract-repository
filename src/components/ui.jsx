@@ -4,10 +4,11 @@ import { STATUS_LABELS } from '../lib/format'
 
 export const APP_NAME = 'Contract Repository'
 
-export function Page({ title, actions, children, wide }) {
+export function Page({ title, actions, children, wide, tabs }) {
   return (
     <AppLayout appName={APP_NAME} links={getLinks()}>
       <div className={`p-4 pt-14 md:pt-8 md:p-8 mx-auto ${wide ? 'max-w-[1600px]' : 'max-w-5xl'}`}>
+        {tabs}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
           <h1 className="font-display text-2xl font-bold text-brand">{title}</h1>
           <div className="flex gap-2">{actions}</div>

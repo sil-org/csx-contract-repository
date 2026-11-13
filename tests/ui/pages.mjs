@@ -10,11 +10,13 @@ const inDays = n => new Date(Date.now() + n * 86400000).toISOString().slice(0, 1
 
 const contract = (id, title, over = {}) => ({
   id, title, type_id: T1, counterparty_id: CP, owner_id: P, backup_owner_id: null, department: 'Ops', status: 'active',
-  effective_date: '2025-01-01', signed_date: '2024-12-15', expiration_date: inDays(90), evergreen: false, binding_status: 'binding',
+  effective_date: '2025-01-01', signed_date: '2024-12-15', expiration_date: inDays(90), evergreen: false,
   sensitivity: 'standard', tags: ['it'], notes: 'hello', renewal_type: 'automatic', renewal_term: '12 months', notice_period_days: 60,
   notice_deadline: inDays(30), termination_for_convenience: true, termination_notice_days: 30, value_amount: 12000, currency: 'USD',
-  payment_terms: 'Net 30', billing_frequency: 'Annual', budget_code: 'X1', parent_id: null, amends_id: null, superseded_by_id: null,
-  details: { vendor_contact: 'Pat', sla_summary: '99.9%' }, provisions: { confidentiality: true }, reminders_enabled: true,
+  payment_terms: 'Net 30', billing_frequency: 'Annual', budget_code: 'X1', amends_id: null, superseded_by_id: null,
+  sign_on_methods: [], annual_amount: 1000, mission_justification: 'Fake mission text.', initial_contract_date: '2025-01-01',
+  signatory_name: 'Jo Signer', signatory_email: 'jo@acme.example', contract_length_years: 1,
+  details: { vendor_contact: 'Pat' }, provisions: { confidentiality: true }, reminders_enabled: true,
   type: { id: T1, name: 'Vendor contract / MSA', form_kind: 'vendor' }, counterparty: { id: CP, name: 'Acme Ltd' }, ...over,
 })
 const contracts = [contract(C1, 'Acme hosting MSA'), contract('00000000-0000-0000-0000-0000000000c2', 'Old draft', { status: 'draft', notice_deadline: null, expiration_date: null })]
@@ -82,6 +84,7 @@ await visit('contract detail', '/contracts/' + C1, 'Fixed signature page', 'admi
 await visit('detail ?decide=1 (from reminder email)', '/contracts/' + C1 + '?decide=1', 'Renewal decision')
 await visit('new contract form', '/contracts/new', 'Create contract')
 await visit('edit contract form', '/contracts/' + C1 + '/edit', 'Save changes')
+await visit('admin index -> redirects to settings', '/admin', 'Reminder lead times')
 await visit('admin users', '/admin/users', 'People with access', 'admin', 'users.png')
 await visit('admin settings', '/admin/settings', 'Reminder lead times')
 await visit('reminder log', '/admin/reminders', 'boom'.length ? 'Failed' : '')
@@ -91,6 +94,7 @@ await visit('viewer: no "New contract" route -> redirected', '/contracts/new', '
 await visit('viewer: admin page -> redirected', '/admin/users', 'Coming due', 'viewer')
 await visit('auditor: audit log ok', '/admin/audit', '1.2.3.4', 'auditor')
 await visit('auditor: users page -> redirected', '/admin/users', 'Coming due', 'auditor')
+await visit('auditor: admin index -> redirects to audit (not settings)', '/admin', '1.2.3.4', 'auditor')
 await visit('no role -> access needed', '/dashboard', 'Access needed', 'null', 'noaccess.png')
 await browser.close()
 let bad = 0

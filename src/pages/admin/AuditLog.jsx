@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { listAudit, getDirectory } from '../../lib/contracts'
 import { fmtDateTime } from '../../lib/format'
 import { Page, ErrorMsg, Loading, inputCls } from '../../components/ui'
+import AdminTabs from '../../components/AdminTabs'
 
 // Append-only record of who did what (spec §9). Read-only for admins and auditors.
 export default function AuditLog() {
@@ -16,7 +17,7 @@ export default function AuditLog() {
   const rows = useMemo(() => (state.rows || []).filter(r => !q || `${who(r.profile_id)} ${r.action} ${r.entity} ${JSON.stringify(r.new_values)}`.toLowerCase().includes(q.toLowerCase())), [state, q]) // eslint-disable-line react-hooks/exhaustive-deps
   const show = v => !v ? '' : Object.entries(v).map(([k, val]) => `${k}: ${JSON.stringify(val)}`).join('; ')
   return (
-    <Page wide title="Audit log">
+    <Page wide title="Audit log" tabs={<AdminTabs />}>
       <ErrorMsg error={state.error} />
       <input className={inputCls + ' mb-3'} placeholder="Filter by person, action, entity or value…" value={q} onChange={e => setQ(e.target.value)} />
       {state.loading ? <Loading /> : (
