@@ -4,12 +4,12 @@ const ME = '00000000-0000-0000-0000-0000000000a1', C1 = '00000000-0000-0000-0000
 const fw = {
   id: C1, title: 'Freshworks CRM', system_name: 'Freshworks CRM (Customer Relationship Management)', type_id: T1, counterparty_id: CP, owner_id: ME, backup_owner_id: null,
   department: 'GRO', department_manager: 'Roy Eyre', status: 'active', effective_date: '2025-11-10', signed_date: '2025-11-10', expiration_date: '2026-11-10', evergreen: false,
-  binding_status: 'binding', sensitivity: 'standard', tags: ['core-operational'], notes: 'https://drive.google.com/open?id=17jQN', renewal_type: 'automatic', renewal_term: '12 months',
+  sensitivity: 'standard', tags: ['core-operational'], notes: 'https://drive.google.com/open?id=17jQN', renewal_type: 'automatic', renewal_term: '12 months',
   notice_period_days: 60, notice_terms: '60 days', notice_deadline: '2026-09-11', termination_for_convenience: null, termination_notice_days: null,
   value_amount: null, currency: 'USD', payment_terms: null, billing_frequency: null, budget_code: null, annual_amount: 35000, annual_amount_note: 'quoted as $35k',
-  mission_justification: 'As a non profit, our donors are critical to our mission.', initial_contract_date: '2020-11-06', signatory_name: 'Sheryl Howe', last_renewal_date: '2025-11-10',
-  administrators: 'crm-admin@sil.org', corporate_license: true, google_sso: false, pricing_info: 'See most recent pricing', vendor_contact_note: 'Do not contact the vendor without speaking to the department manager.',
-  parent_id: null, amends_id: null, superseded_by_id: null, details: {}, provisions: {}, reminders_enabled: true,
+  mission_justification: 'As a non profit, our donors are critical to our mission.', initial_contract_date: '2020-11-06', signatory_name: 'Sheryl Howe', signatory_email: 'sheryl.howe@freshworks.example', contract_length_years: 1, last_renewal_date: '2025-11-10',
+  administrators: 'crm-admin@sil.org', corporate_license: true, sign_on_methods: ['google'], pricing_info: 'See most recent pricing', vendor_contact_note: 'Do not contact the vendor without speaking to the department manager.',
+  amends_id: null, superseded_by_id: null, details: {}, provisions: {}, reminders_enabled: true,
   type: { id: T1, name: 'Software subscription / system', form_kind: 'vendor' }, counterparty: { id: CP, name: 'Freshworks' } }
 const writes = []
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--no-sandbox'] })
@@ -43,7 +43,7 @@ let t = await open('/contracts/' + C1)
 await t.page.getByText('Initial contract').first().waitFor({ timeout: 8000 })
 const body = await t.page.locator('main').innerText()
 for (const [label, needle] of [
-  ['system', 'Freshworks CRM (Customer Relationship Management)'], ['department manager', 'Roy Eyre'], ['initial contract date + signer', 'Nov 6, 2020 · signed by Sheryl Howe'],
+  ['system', 'Freshworks CRM (Customer Relationship Management)'], ['department manager', 'Roy Eyre'], ['initial contract date', 'Nov 6, 2020'], ['current signatory', 'Sheryl Howe'],
   ['last renewal date', 'Nov 10, 2025'], ['next renewal date (label)', 'Expires / next renewal'], ['notice terms as written', '60 days'], ['last day to cancel', 'Sep 11, 2026'],
   ['annual amount + thousands', '$35,000.00 (≈ $35k)'], ['annual amount notes', 'quoted as $35k'], ['mission paragraph', 'our donors are critical to our mission'],
   ['administrators', 'crm-admin@sil.org'], ['pricing info', 'See most recent pricing'], ['corporate license yes', 'Corporate license'], ['vendor contact rule', 'Do not contact the vendor without speaking to the department manager'],
@@ -58,11 +58,12 @@ const val = async label => t.page.locator('label', { hasText: label }).locator('
 check('form loads department manager', await val('Department manager') === 'Roy Eyre')
 check('form loads annual amount', await val('Annual amount (vendor license only)') === '35000')
 check('form loads signatory name', await val('Signatory name') === 'Sheryl Howe')
-check('form loads corporate license = Yes and Google sign-in = No', await val('Corporate (organization-wide) license?') === 'true' && await val('Uses Google sign-in?') === 'false')
-check('form loads mission paragraph', (await val('Why this software advances our mission')).includes('donors'))
+check('form loads corporate license = Yes and Google sign-on checked', await val('Corporate (organization-wide) license?') === 'true'
+  && await t.page.locator('label', { hasText: 'Google' }).locator('input[type=checkbox]').isChecked())
+check('form loads mission paragraph', (await val('Rationale: Why this software advances our mission')).includes('donors'))
 await t.page.locator('label', { hasText: 'Annual amount: notes' }).locator('input').fill('  quoted as $35k + 2% fees  ')
 await t.page.locator('label', { hasText: 'Administrator(s)' }).locator('input').fill('')
-await t.page.locator('label', { hasText: 'Uses Google sign-in?' }).locator('select').selectOption('')
+await t.page.locator('label', { hasText: 'Google' }).locator('input[type=checkbox]').uncheck()
 await t.page.getByRole('button', { name: 'Save changes' }).click()
 await t.page.waitForURL('**/contracts/' + C1, { timeout: 8000 })
 const w = writes.at(-1)?.body || {}
@@ -70,23 +71,37 @@ check('save sends a PATCH to contracts', writes.at(-1)?.method === 'PATCH')
 check('annual_amount sent as a number', w.annual_amount === 35000)
 check('free-text notes are trimmed', w.annual_amount_note === 'quoted as $35k + 2% fees')
 check('emptied field is sent as null, not ""', w.administrators === null)
-check('yes stays true, unknown becomes null (never false)', w.corporate_license === true && w.google_sso === null)
-check('dates and names saved', w.initial_contract_date === '2020-11-06' && w.signatory_name === 'Sheryl Howe' && w.last_renewal_date === '2025-11-10' && w.notice_terms === '60 days' && w.system_name.startsWith('Freshworks'))
+check('yes stays true; unchecked sign-on method is sent as an empty array', w.corporate_license === true && Array.isArray(w.sign_on_methods) && w.sign_on_methods.length === 0)
+check('dates saved', w.initial_contract_date === '2020-11-06' && w.last_renewal_date === '2025-11-10' && w.notice_terms === '60 days' && w.system_name.startsWith('Freshworks'))
 check('vendor contact rule saved', w.vendor_contact_note.startsWith('Do not contact'))
+check('editing an existing contract does not resend signatory_name/email (it is a history-synced cache now)', !('signatory_name' in w) && !('signatory_email' in w))
 check('no errors on edit/save', t.errors.length === 0); if (t.errors.length) console.log(t.errors)
 await t.close()
 
-// ---- new contract form: fields present for a software type, blanks saved as null ----
+// ---- new contract form: fields present for a software type; required fields must be filled,
+// still-optional sheet fields are saved as null/empty when left untouched ----
 t = await open('/contracts/new')
 await t.page.getByText('System and subscription details').waitFor({ timeout: 8000 })
 await t.page.locator('label', { hasText: 'Title' }).first().locator('input').fill('Zoom')
-await t.page.locator('label', { hasText: 'Counterparty' }).locator('input').fill('Zoom')
+await t.page.locator('label', { hasText: 'Vendor' }).first().locator('input').fill('Zoom')
 await t.page.locator('label', { hasText: 'Department / program' }).locator('input').fill('GTIS')
 await t.page.locator('label', { hasText: 'Internal owner' }).locator('select').selectOption(ME)
+await t.page.locator('label', { hasText: 'Initial contract date' }).locator('input').fill('2026-01-01')
+await t.page.locator('label', { hasText: 'Signatory name' }).locator('input').fill('Jo Signer')
+await t.page.locator('label', { hasText: 'Signatory email' }).locator('input').fill('jo@zoom.example')
+await t.page.locator('label', { hasText: 'Signed date (current term)' }).locator('input').fill('2026-01-01')
+await t.page.locator('label', { hasText: 'Effective date' }).locator('input').fill('2026-01-01')
+await t.page.locator('label', { hasText: 'Expiration / next renewal date' }).locator('input').fill('2027-01-01')
+await t.page.locator('label', { hasText: 'Contract length (years)' }).locator('input').fill('1')
+await t.page.locator('label', { hasText: 'Annual amount (vendor license only)' }).locator('input').fill('1000')
+await t.page.locator('label', { hasText: 'Rationale: Why this software advances our mission' }).locator('textarea').fill('Needed for day-to-day operations.')
 await t.page.getByRole('button', { name: 'Create contract' }).click()
 await t.page.waitForURL('**/contracts/' + C1, { timeout: 8000 })
 const n = writes.at(-1)?.body || {}
 check('new contract: POST', writes.at(-1)?.method === 'POST')
-check('new contract: untouched sheet fields are null', n.annual_amount === null && n.corporate_license === null && n.google_sso === null && n.initial_contract_date === null && n.system_name === null && n.administrators === null)
+check('new contract: required sheet fields are sent', n.annual_amount === 1000 && n.initial_contract_date === '2026-01-01'
+  && n.signatory_name === 'Jo Signer' && n.contract_length_years === 1 && n.mission_justification === 'Needed for day-to-day operations.')
+check('new contract: still-untouched optional sheet fields are null/empty', n.corporate_license === null && n.system_name === null
+  && n.administrators === null && Array.isArray(n.sign_on_methods) && n.sign_on_methods.length === 0)
 check('new contract: no errors', t.errors.length === 0); if (t.errors.length) console.log(t.errors)
 await t.close(); await browser.close(); process.exit(failed ? 1 : 0)

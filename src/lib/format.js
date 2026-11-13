@@ -54,8 +54,8 @@ export const STATUS_LABELS = {
   draft: 'Draft', active: 'Active', expired: 'Expired',
   terminated: 'Terminated', superseded: 'Superseded', completed: 'Completed',
 }
-export const BINDING_LABELS = { non_binding: 'Non-binding', partly_binding: 'Partly binding', binding: 'Binding' }
 export const RENEWAL_LABELS = { none: 'None', automatic: 'Automatic', option_to_renew: 'Option to renew', manual: 'Manual (mutual consent)' }
+export const SIGN_ON_LABELS = { google: 'Google', saml: 'SAML', local: 'Local account' }
 export const DOC_ROLE_LABELS = {
   original: 'Original (executed)', amendment: 'Amendment', exhibit: 'Exhibit / Schedule',
   correspondence: 'Correspondence', msa: 'MSA copy', other: 'Other',

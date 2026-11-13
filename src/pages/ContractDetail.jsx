@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { Pencil } from 'lucide-react'
 import { getContract, getDirectory, listContracts } from '../lib/contracts'
-import { fmtDate, fmtDateTime, fmtMoney, BINDING_LABELS, RENEWAL_LABELS, PROVISIONS, daysUntil } from '../lib/format'
+import { fmtDate, fmtDateTime, fmtMoney, RENEWAL_LABELS, SIGN_ON_LABELS, PROVISIONS, daysUntil } from '../lib/format'
 import { Page, Card, SectionNav, StatusBadge, ErrorMsg, Loading, ConfidentialNote, btnSecondary } from '../components/ui'
-import { DocumentsPanel, DecisionPanel, MilestonesPanel, LinksPanel, AccessPanel, RelationshipsPanel, HistoryPanel } from '../components/contract/panels'
+import { DocumentsPanel, DecisionPanel, MilestonesPanel, LinksPanel, AccessPanel, RelationshipsPanel, SignatoriesPanel, HistoryPanel } from '../components/contract/panels'
 import { useAuth, useCan } from '../context/AuthContext'
 
 function Row({ label, children }) {
@@ -48,7 +48,7 @@ export default function ContractDetail() {
   const hasDecision = c.status === 'active' && !!c.notice_deadline
   const hasFinancial = c.annual_amount != null || c.annual_amount_note || c.value_amount != null || c.payment_terms || c.billing_frequency || c.budget_code
   const hasTypeDetails = Object.values(d).some(Boolean)
-  const hasSystemDetails = c.mission_justification || c.administrators || c.pricing_info || c.vendor_contact_note || c.corporate_license != null || c.google_sso != null || c.custom_msa
+  const hasSystemDetails = c.mission_justification || c.administrators || c.pricing_info || c.vendor_contact_note || c.corporate_license != null || c.sign_on_methods?.length > 0 || c.custom_msa
   const navItems = [
     { id: 'decision', label: 'Renewal decision', show: hasDecision },
     { id: 'overview', label: 'Overview' },
@@ -61,6 +61,7 @@ export default function ContractDetail() {
     { id: 'milestones', label: 'Milestones', show: sectionVisible.milestones ?? true },
     { id: 'links', label: 'Working-copy links', show: sectionVisible.links ?? true },
     { id: 'access', label: 'Access', show: c.sensitivity === 'restricted' },
+    { id: 'signatories', label: 'Signatory history', show: sectionVisible.signatories ?? true },
     { id: 'relationships', label: 'Related contracts', show: sectionVisible.relationships ?? true },
     { id: 'history', label: 'History', show: can.seeAudit },
   ]
@@ -100,8 +101,6 @@ export default function ContractDetail() {
           <Row label="Department manager email">{c.department_manager_email}</Row>
           <Row label="Backup owner">{name(c.backup_owner_id)}</Row>
           <Row label="Department">{c.department}</Row>
-          <Row label="Binding status">{BINDING_LABELS[c.binding_status]}</Row>
-          <Row label="Governing law">{c.governing_law}</Row>
           <Row label="Reminders">{c.reminders_enabled ? 'On' : 'Off'}</Row>
           <Row label="Original not on file">{c.no_original_exception && (
             <span className="text-amber-800">
@@ -117,7 +116,8 @@ export default function ContractDetail() {
 
       <Card title="Dates & renewal" id="dates">
         <dl className="divide-y divide-gray-50">
-          <Row label="Initial contract">{c.initial_contract_date && `${fmtDate(c.initial_contract_date)}${c.signatory_name ? ` · signed by ${c.signatory_name}` : ''}`}{!c.initial_contract_date && c.signatory_name}</Row>
+          <Row label="Initial contract date">{c.initial_contract_date && fmtDate(c.initial_contract_date)}</Row>
+          <Row label="Current signatory">{c.signatory_name}</Row>
           <Row label="Signatory email">{c.signatory_email}</Row>
           <Row label="Last renewed">{c.last_renewal_date && fmtDate(c.last_renewal_date)}</Row>
           <Row label="Signed (current term)">{c.signed_date && fmtDate(c.signed_date)}</Row>
@@ -149,18 +149,16 @@ export default function ContractDetail() {
         <Card title={`${c.type?.name?.split(' (')[0] || 'Type'} details`} id="type-details"><dl className="divide-y divide-gray-50">
           <Row label="Purpose">{d.purpose}</Row><Row label="Next step">{d.next_step}</Row><Row label="Target date">{d.target_date && fmtDate(d.target_date)}</Row>
           <Row label="Binding clauses">{d.binding_clauses}</Row><Row label="Project">{d.project_name}</Row><Row label="Deliverables">{d.deliverables}</Row>
-          <Row label="Vendor contact">{d.vendor_contact}</Row><Row label="SLA summary">{d.sla_summary}</Row>
-          <Row label="Certificate expiry">{d.insurance_expiry && fmtDate(d.insurance_expiry)}</Row>
-          <Row label="Data-protection terms">{d.data_protection_terms ? 'Present' : null}</Row>
+          <Row label="Vendor contact">{d.vendor_contact}</Row>
         </dl></Card>
       )}
       {hasSystemDetails && (
         <Card title="System and subscription details" id="system"><dl className="divide-y divide-gray-50">
-          <Row label="Why it advances our mission"><span className="whitespace-pre-wrap">{c.mission_justification}</span></Row>
+          <Row label="Rationale"><span className="whitespace-pre-wrap">{c.mission_justification}</span></Row>
           <Row label="Administrator(s)">{c.administrators}</Row>
           <Row label="More information / pricing">{c.pricing_info}</Row>
           <Row label="Corporate license">{c.corporate_license == null ? null : c.corporate_license ? 'Yes' : 'No'}</Row>
-          <Row label="Google sign-in">{c.google_sso == null ? null : c.google_sso ? 'Yes' : 'No'}</Row>
+          <Row label="Sign-on method">{c.sign_on_methods?.length > 0 ? c.sign_on_methods.map(m => SIGN_ON_LABELS[m] || m).join(', ') : null}</Row>
           <Row label="Custom MSA">{c.custom_msa ? 'Yes' : null}</Row>
           <Row label="Vendor contact rule">{c.vendor_contact_note && <strong className="text-amber-800">{c.vendor_contact_note}</strong>}</Row>
         </dl></Card>
@@ -171,6 +169,7 @@ export default function ContractDetail() {
       <MilestonesPanel contract={c} canEdit={canEdit} onVisible={setVisible('milestones')} />
       <LinksPanel contract={c} canEdit={canEdit} profileId={profile?.id} onVisible={setVisible('links')} />
       <AccessPanel contract={c} canEdit={canEdit} directory={directory} profileId={profile?.id} />
+      <SignatoriesPanel contract={c} canEdit={canEdit} profileId={profile?.id} onVisible={setVisible('signatories')} />
       <RelationshipsPanel contract={c} allContracts={all} onVisible={setVisible('relationships')} />
       {can.seeAudit && <HistoryPanel contract={c} directory={directory} />}
         </div>

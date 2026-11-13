@@ -98,6 +98,12 @@ Deno.serve(async (req) => {
 
   try {
     const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+
+    // Catches a signatory-history entry whose start_date has just arrived (09_responsible_party_
+    // history.sql) -- best-effort housekeeping, so a failure here shouldn't block real reminders.
+    const { error: resyncErr } = await db.rpc('contract_resync_signatories')
+    if (resyncErr) console.error('could not resync signatories', resyncErr.message)
+
     const { data, error } = await db.rpc('contract_reminders_due')
     if (error) throw error
     let due = (data ?? []) as Due[]

@@ -93,8 +93,23 @@ export async function revokeAccess(contractId, profileId) {
   return unwrap(await supabase.from('contract_access').delete().eq('contract_id', contractId).eq('profile_id', profileId))
 }
 
+// Current signatory_name/signatory_email on `contracts` are a synced cache of the latest row here
+// on or before today (supabase/contracts/09_responsible_party_history.sql) -- add a dated entry
+// rather than editing those columns directly, so the history stays accurate for long-running contracts.
+export async function listSignatories(contractId) {
+  return unwrap(await supabase.from('contract_signatories').select('*').eq('contract_id', contractId).order('start_date', { ascending: false }))
+}
+export async function addSignatory(contractId, { name, email, start_date, note }, createdBy) {
+  return unwrap(await supabase.from('contract_signatories').insert({
+    contract_id: contractId, name, email: email || null, start_date, note: note || null, created_by: createdBy,
+  }))
+}
+export async function deleteSignatory(id) {
+  return unwrap(await supabase.from('contract_signatories').delete().eq('id', id))
+}
+
 export async function listRelated(contractId) {
-  return unwrap(await supabase.from('contracts').select('id, title, status, parent_id, amends_id').or(`parent_id.eq.${contractId},amends_id.eq.${contractId}`).order('title'))
+  return unwrap(await supabase.from('contracts').select('id, title, status, amends_id').eq('amends_id', contractId).order('title'))
 }
 
 export async function listAudit({ contractId, limit = 200 } = {}) {

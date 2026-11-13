@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getSettings, saveSetting, listTypes, saveType } from '../../lib/contracts'
 import { Page, Card, Field, ErrorMsg, Loading, btnPrimary, btnSecondary, inputCls } from '../../components/ui'
+import AdminTabs from '../../components/AdminTabs'
 
 const KINDS = { mou: 'MOU fields', sow: 'SOW fields', vendor: 'Vendor fields', other: 'General' }
 
@@ -80,7 +81,7 @@ export default function AdminSettings() {
   }
 
   return (
-    <Page title="Settings">
+    <Page title="Settings" tabs={<AdminTabs />}>
       <ErrorMsg error={err} />
       {msg && <div className="bg-green-50 border border-green-200 text-green-800 text-sm rounded-lg px-3 py-2 mb-3">{msg}</div>}
       {!s ? <Loading /> : (
