@@ -186,7 +186,16 @@ keep the positive-control checks, and for a new rule, break it on purpose once t
   - Verified the same way as 08 above (disposable `postgres:16-alpine` container): migrations 01→09 run
     clean twice in a row, the full SQL suite passes, `npm run build` succeeds, and
     `tests/ui/{pages,sheet_fields,users}.mjs` all pass (same one pre-existing `pages.mjs` failure as noted
-    above, still unrelated). **Migration 09 has not yet been run against the real Supabase project.**
+    above, still unrelated). **Migration 09 has been run against the real Supabase project (2026-11-13;
+    this line previously said otherwise — corrected 2026-11-13).**
+- **Built (2026-11-13):** the sidebar's nested Admin submenu could never be opened by click while the
+  sidebar was collapsed (the heading had no route to navigate to, and the expand-toggle was disabled
+  while collapsed). Replaced with a single `/admin` sidebar link plus a horizontal `AdminTabs` bar
+  (`src/components/AdminTabs.jsx`) on each admin page, matching license-manager's `/admin` layout —
+  `Page` in `src/components/ui.jsx` gained a `tabs` prop rendered above the title. `/admin` itself
+  redirects admins to `/admin/settings` and auditors (who can't see Settings) to `/admin/audit`, so
+  auditors don't get bounced out of the admin area entirely. Covered by two new cases in
+  `tests/ui/pages.mjs`.
 - **Open decision:** whether the sheet's "Other Systems" tab (many rows with no contract) is imported, and as
   what — on hold (2026-10-08), revisit later.
 - **Planned, not built:** import of the existing tracking sheet (it is confidential — don't commit it);
