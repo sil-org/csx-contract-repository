@@ -18,7 +18,7 @@ $PSQL -d postgres -c "create database t"
 export PGOPTIONS="-c client_min_messages=warning"
 $PSQL -d t -f "$HERE/00_stubs.sql"
 $PSQL -d t -f "$KERNEL"
-for m in 01_contracts_schema 03_user_search 04_sheet_fields 05_original_exception 06_signatory_and_custom_msa 07_notification_requirements 08_field_cleanup 09_responsible_party_history; do   # 02 needs pg_cron/Vault, which only exist on Supabase
+for m in 01_contracts_schema 03_user_search 04_sheet_fields 05_original_exception 06_signatory_and_custom_msa 07_notification_requirements 08_field_cleanup 09_responsible_party_history 10_rename_vendor_type; do   # 02 needs pg_cron/Vault, which only exist on Supabase
   $PSQL -d t -f "$HERE/../contracts/$m.sql"
   $PSQL -d t -f "$HERE/../contracts/$m.sql"          # idempotent re-run
 done

@@ -105,7 +105,7 @@ insert into contracts (
 -- #3 Vendor/MSA with Custom MSA checked — LEFT IN DRAFT (needs a real 'msa'
 -- document to activate; this is the one scenario this script can't fake)
 ('eeee0000-0000-0000-0000-000000000003', 'Mock Logistics — Field Supply MSA (custom terms)',
- (select id from contract_types where name = 'Vendor contract / MSA'),
+ (select id from contract_types where name = 'Vendor contract'),
  (select id from contract_counterparties where name = 'Mock Logistics Group (Test)'),
  (select id from profiles where primary_email = 'kate_brenner@sil.org'),
  'ZZ Test - Logistics', 'draft',
@@ -121,7 +121,7 @@ insert into contracts (
 
 -- #4 Vendor/MSA, Active — the successor to #12
 ('eeee0000-0000-0000-0000-000000000004', 'Acme SecureDrive — Vendor MSA',
- (select id from contract_types where name = 'Vendor contract / MSA'),
+ (select id from contract_types where name = 'Vendor contract'),
  (select id from contract_counterparties where name = 'Acme Testing Corp (Test)'),
  (select id from profiles where primary_email = 'kate_brenner@sil.org'),
  'ZZ Test - IT', 'draft',
@@ -173,7 +173,7 @@ insert into contracts (
 -- #7 Vendor, Expired (straight to Expired — never passed through Active, so
 -- no original/exception is required by the guard)
 ('eeee0000-0000-0000-0000-000000000007', 'Sandbox ComplySuite — lapsed subscription',
- (select id from contract_types where name = 'Vendor contract / MSA'),
+ (select id from contract_types where name = 'Vendor contract'),
  (select id from contract_counterparties where name = 'Sandbox Compliance Partners (Test)'),
  (select id from profiles where primary_email = 'kate_brenner@sil.org'),
  'ZZ Test - Compliance', 'draft',
@@ -189,7 +189,7 @@ insert into contracts (
 
 -- #8 Vendor, Terminated for convenience
 ('eeee0000-0000-0000-0000-000000000008', 'Mock Logistics — Materials Shipping Contract',
- (select id from contract_types where name = 'Vendor contract / MSA'),
+ (select id from contract_types where name = 'Vendor contract'),
  (select id from contract_counterparties where name = 'Mock Logistics Group (Test)'),
  (select id from profiles where primary_email = 'kate_brenner@sil.org'),
  'ZZ Test - Logistics', 'draft',
@@ -239,7 +239,7 @@ insert into contracts (
 -- #11 Vendor, Active, notice deadline already PASSED (like the
 -- Zoom/Freshworks examples already in CLAUDE.md — good for dashboard testing)
 ('eeee0000-0000-0000-0000-00000000000b', 'Fixture Webinar — Training Platform',
- (select id from contract_types where name = 'Vendor contract / MSA'),
+ (select id from contract_types where name = 'Vendor contract'),
  (select id from contract_counterparties where name = 'Fixture Video Conferencing Co. (Test)'),
  (select id from profiles where primary_email = 'kate_brenner@sil.org'),
  'ZZ Test - Comms', 'draft',
@@ -269,7 +269,7 @@ insert into contracts (
 ) values
 -- #12 Vendor, Superseded by #4 (the old Acme MSA this replaced)
 ('eeee0000-0000-0000-0000-00000000000c', 'Acme SecureDrive — original MSA (superseded)',
- (select id from contract_types where name = 'Vendor contract / MSA'),
+ (select id from contract_types where name = 'Vendor contract'),
  (select id from contract_counterparties where name = 'Acme Testing Corp (Test)'),
  (select id from profiles where primary_email = 'kate_brenner@sil.org'),
  'ZZ Test - IT', 'draft',

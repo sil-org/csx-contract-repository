@@ -143,7 +143,7 @@ create temp table made(id uuid);
 grant all on made to authenticated;
 with ins as (
     insert into contracts (title, type_id, counterparty_id, owner_id, department)
-    values ('Cora standard', (select id from contract_types where name = 'Vendor contract / MSA'),
+    values ('Cora standard', (select id from contract_types where name = 'Vendor contract'),
             '00000000-0000-0000-0000-0000000000c1', :'P_cora', 'Ops')
     returning id)
   insert into made select id from ins;

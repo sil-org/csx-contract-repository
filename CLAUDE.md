@@ -196,6 +196,23 @@ keep the positive-control checks, and for a new rule, break it on purpose once t
   redirects admins to `/admin/settings` and auditors (who can't see Settings) to `/admin/audit`, so
   auditors don't get bounced out of the admin area entirely. Covered by two new cases in
   `tests/ui/pages.mjs`.
+- **Built (2026-11-17):** two small fixes on `notification-requirements`:
+  - The seeded contract type "Vendor contract / MSA" conflated two separate things — MSA is the
+    `custom_msa` flag + an attached `msa`-role document (migration 06), not a contract type of its
+    own. Renamed to plain "Vendor contract" via `10_rename_vendor_type.sql`; `01_contracts_schema.sql`'s
+    insert was updated to match (a no-op for anyone who already ran 01, same precedent as 08's
+    `parent_id` guard edit). Updated every reference to the old name (`supabase/seed/test_contracts.sql`,
+    `supabase/tests/20_security_test.sql`, `tests/ui/pages.mjs`, `run.sh`'s migration list).
+  - The Edit contract form's section nav is now the same sticky left sidebar as the contract detail
+    page (`SectionNav orientation="left"` in `src/pages/ContractForm.jsx`), instead of only the
+    horizontal bar at the top.
+  - Verified the same way as 08/09 above (disposable `postgres:16-alpine` container, Docker wasn't
+    running so it was started first): migrations 01→10 run clean twice in a row, the full SQL suite
+    passes (including the renamed-type references in `20_security_test.sql` and `30_sheet_fields_test.sql`),
+    `npm run build` succeeds, and all three `tests/ui/*.mjs` suites pass (same pre-existing, unrelated
+    `pages.mjs` `?decide=1` failure as before). **Migration 10 has not yet been run against the real
+    Supabase project** — do that before merging this branch's app changes, per the usual migration-then-app
+    ordering.
 - **Open decision:** whether the sheet's "Other Systems" tab (many rows with no contract) is imported, and as
   what — on hold (2026-10-08), revisit later.
 - **Planned, not built:** import of the existing tracking sheet (it is confidential — don't commit it);
