@@ -38,7 +38,9 @@ export function Card({ title, children, actions, id }) {
 // section that isn't actually on the page. Renders nothing for 0-1 sections.
 // orientation="left": a sticky vertical nav for a flex layout (md+), falling back to the
 // horizontal bar below md. orientation="top" (default): always the horizontal bar.
-export function SectionNav({ items, orientation = 'top' }) {
+// `title`, orientation="left" only: shown above the links, so it stays visible once the
+// page's own <h1> has scrolled out of view.
+export function SectionNav({ items, orientation = 'top', title }) {
   const visible = items.filter(i => i.show !== false)
   if (visible.length < 2) return null
   const jump = i => e => { e.preventDefault(); document.getElementById(i.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
@@ -56,6 +58,7 @@ export function SectionNav({ items, orientation = 'top' }) {
     <>
       {topNav}
       <nav aria-label="Jump to section" className="hidden md:block w-44 flex-shrink-0 sticky top-8 self-start text-sm">
+        {title && <p className="font-semibold text-gray-800 mb-2 truncate" title={title}>{title}</p>}
         <ul className="space-y-1.5 border-l border-gray-200">
           {visible.map(i => (
             <li key={i.id}>

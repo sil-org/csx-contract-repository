@@ -88,7 +88,7 @@ export default function ContractDetail() {
       </div>
 
       <div className="md:flex md:gap-8 md:items-start">
-        <SectionNav items={navItems} orientation="left" />
+        <SectionNav items={navItems} orientation="left" title={c.title} />
         <div className="flex-1 min-w-0">
 
       <DecisionPanel contract={c} canEdit={canEdit} directory={directory} profileId={profile?.id} autoOpen={!!params.get('decide')} />

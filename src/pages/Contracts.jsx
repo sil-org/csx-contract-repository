@@ -88,7 +88,6 @@ export default function Contracts() {
       })
     }
     const val = c => ({ title: c.title, counterparty: c.counterparty?.name, type: c.type?.name, status: c.status, owner: ownerName(c.owner_id),
-      signed: c.signed_date || '9999', renewed: c.last_renewal_date || '9999',
       notice: c.notice_deadline || '9999', expires: c.expiration_date || '9999' }[sort.key] ?? '')
     return out.sort((a, b) => String(val(a)).localeCompare(String(val(b))) * sort.dir)
     // Multi-select filters (f.status/type/owner/dept/vendor) are new arrays every render, so key
@@ -216,7 +215,7 @@ export default function Contracts() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 text-gray-600"><tr>
                   <Th k="title">Title</Th><Th k="counterparty">Vendor</Th><Th k="type">Type</Th><Th k="status">Status</Th>
-                  <Th k="owner">Owner</Th><Th k="value">Value</Th><Th k="signed">Signed</Th><Th k="renewed">Last renewal</Th>
+                  <Th k="owner">Owner</Th><Th k="value">Value</Th>
                   <Th k="notice">Notice deadline</Th><Th k="expires">Expires</Th>
                 </tr></thead>
                 <tbody className="divide-y divide-gray-100">
@@ -232,13 +231,11 @@ export default function Contracts() {
                       <td className="px-3 py-2"><StatusBadge status={c.status} /></td>
                       <td className="px-3 py-2">{ownerName(c.owner_id)}</td>
                       <td className="px-3 py-2 whitespace-nowrap">{fmtMoney(c.value_amount, c.currency)}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{fmtDate(c.signed_date)}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{fmtDate(c.last_renewal_date)}</td>
                       <td className="px-3 py-2 whitespace-nowrap">{c.evergreen ? 'Evergreen' : fmtDate(c.notice_deadline)}</td>
                       <td className="px-3 py-2 whitespace-nowrap">{c.evergreen ? '—' : fmtDate(c.expiration_date)}</td>
                     </tr>
                   ))}
-                  {!rows.length && <tr><td colSpan={10} className="px-3 py-8 text-center text-gray-400">No contracts match.</td></tr>}
+                  {!rows.length && <tr><td colSpan={8} className="px-3 py-8 text-center text-gray-400">No contracts match.</td></tr>}
                 </tbody>
               </table>
             </div>

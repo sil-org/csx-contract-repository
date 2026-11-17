@@ -60,7 +60,7 @@ create table if not exists contract_types (
 insert into contract_types (name, form_kind, sort_order) values
   ('Memorandum of Understanding (MOU)', 'mou', 10),
   ('Statement of Work (SOW)',           'sow', 20),
-  ('Vendor contract / MSA',             'vendor', 30),
+  ('Vendor contract',                   'vendor', 30),
   ('Other',                             'other', 90)
 on conflict (name) do nothing;
 

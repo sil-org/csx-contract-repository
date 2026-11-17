@@ -147,7 +147,9 @@ export default function ContractForm() {
   return (
     <Page title={id ? 'Edit contract' : 'New contract'}>
       <ErrorMsg error={error} />
-      <SectionNav items={navItems} />
+      <div className="md:flex md:gap-8 md:items-start">
+        <SectionNav items={navItems} orientation="left" title={id ? form.title : undefined} />
+        <div className="flex-1 min-w-0">
       <form onSubmit={submit}>
         <Card title="Basics" id="basics">
           <div className="grid md:grid-cols-2 gap-4">
@@ -349,6 +351,8 @@ export default function ContractForm() {
         </div>
         {!id && <p className="text-xs text-gray-400 mt-3">New contracts start as a draft. Upload the executed original on the next page, then set the status to Active.</p>}
       </form>
+        </div>
+      </div>
     </Page>
   )
 }

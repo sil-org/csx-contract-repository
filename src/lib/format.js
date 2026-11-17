@@ -37,8 +37,8 @@ export function daysUntil(d) {
 
 // Shortens a contract type name to its acronym where the name plainly carries
 // one — a trailing "(MOU)"/"(SOW)" or a short all-caps segment after a slash
-// ("Vendor contract / MSA" -> "MSA"). Otherwise returns the name unchanged
-// (e.g. "Other", "Software subscription / system") rather than guess.
+// (e.g. a future "Non-disclosure agreement / NDA"). Otherwise returns the name
+// unchanged (e.g. "Other", "Software subscription / system") rather than guess.
 export function typeAbbrev(name) {
   if (!name) return ''
   const paren = name.match(/\(([A-Za-z0-9&-]{2,8})\)\s*$/)

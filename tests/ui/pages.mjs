@@ -17,7 +17,7 @@ const contract = (id, title, over = {}) => ({
   sign_on_methods: [], annual_amount: 1000, mission_justification: 'Fake mission text.', initial_contract_date: '2025-01-01',
   signatory_name: 'Jo Signer', signatory_email: 'jo@acme.example', contract_length_years: 1,
   details: { vendor_contact: 'Pat' }, provisions: { confidentiality: true }, reminders_enabled: true,
-  type: { id: T1, name: 'Vendor contract / MSA', form_kind: 'vendor' }, counterparty: { id: CP, name: 'Acme Ltd' }, ...over,
+  type: { id: T1, name: 'Vendor contract', form_kind: 'vendor' }, counterparty: { id: CP, name: 'Acme Ltd' }, ...over,
 })
 const contracts = [contract(C1, 'Acme hosting MSA'), contract('00000000-0000-0000-0000-0000000000c2', 'Old draft', { status: 'draft', notice_deadline: null, expiration_date: null })]
 const me = { id: P, display_name: 'Test Admin', primary_email: 'admin@sil.org', role: 'member' }
@@ -27,7 +27,7 @@ const doc = { id: 'd1', contract_id: C1, doc_key: 'k1', version: 2, role: 'origi
 let role = 'admin'
 const tables = {
   profiles: [me],
-  contracts, contract_types: [{ id: T1, name: 'Vendor contract / MSA', form_kind: 'vendor', sort_order: 30, active: true }],
+  contracts, contract_types: [{ id: T1, name: 'Vendor contract', form_kind: 'vendor', sort_order: 30, active: true }],
   contract_counterparties: [{ id: CP, name: 'Acme Ltd' }],
   contract_decisions: [], contract_documents: [doc, { ...doc, id: 'd0', version: 1, change_note: 'Executed copy' }], contract_milestones: [{ id: 'm1', contract_id: C1, due_on: inDays(10), description: 'Phase 1', completed_at: null }],
   contract_links: [{ id: 'l1', contract_id: C1, url: 'https://drive.google.com/x', label: 'Working copy' }], contract_access: [],
