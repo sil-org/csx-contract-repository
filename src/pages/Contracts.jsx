@@ -11,7 +11,7 @@ const NUMERIC_SORT_KEYS = new Set(['value'])
 // Scalar (single-value) vs. multi-select filter params — kept separate because multi-select
 // values are read/written as repeated query params (?status=active&status=draft), not one string.
 const SCALAR_FILTER_KEYS = ['q', 'valueMin', 'valueMax', 'signedFrom', 'signedTo', 'renewFrom', 'renewTo']
-const MULTI_FILTER_KEYS = ['status', 'type', 'owner', 'dept', 'vendor']
+const MULTI_FILTER_KEYS = ['status', 'type', 'owner', 'vendor']
 const FILTER_KEYS = [...SCALAR_FILTER_KEYS, ...MULTI_FILTER_KEYS]
 // New contracts are overwhelmingly what people want to see day-to-day; everything else (expired,
 // terminated, etc.) is opt-in. Only applies until the status filter is touched (see `f.status` below).
@@ -20,7 +20,7 @@ const DEFAULT_STATUSES = ['active', 'draft']
 const ALL_SENTINEL = '__all__'
 const FILTERS_COLLAPSE_KEY = 'contracts.filtersCollapsed'
 
-// Filter/sort by type, status, vendor, owner, department, tag, text, value, and date ranges (R-S1/R-S2 metadata).
+// Filter/sort by type, status, vendor, owner, tag, text, value, and date ranges (R-S1/R-S2 metadata).
 export default function Contracts() {
   const can = useCan()
   const [params, setParams] = useSearchParams()
@@ -42,7 +42,7 @@ export default function Contracts() {
 
   const f = {
     ...Object.fromEntries(SCALAR_FILTER_KEYS.map(k => [k, params.get(k) || ''])),
-    ...Object.fromEntries(['type', 'owner', 'dept', 'vendor'].map(k => [k, params.getAll(k)])),
+    ...Object.fromEntries(['type', 'owner', 'vendor'].map(k => [k, params.getAll(k)])),
     status: (() => {
       const raw = params.getAll('status')
       if (!raw.length) return DEFAULT_STATUSES
@@ -59,16 +59,15 @@ export default function Contracts() {
     setParams(p, { replace: true })
   }
   const clearFilters = () => { const p = new URLSearchParams(params); FILTER_KEYS.forEach(k => p.delete(k)); setParams(p, { replace: true }) }
-  const filtersActive = SCALAR_FILTER_KEYS.some(k => f[k]) || ['type', 'owner', 'dept', 'vendor'].some(k => f[k].length) || params.has('status')
+  const filtersActive = SCALAR_FILTER_KEYS.some(k => f[k]) || ['type', 'owner', 'vendor'].some(k => f[k].length) || params.has('status')
 
   const ownerName = id => state.directory?.find(p => p.id === id)?.display_name || ''
-  const departments = useMemo(() => [...new Set((state.contracts || []).map(c => c.department))].sort(), [state.contracts])
 
   const rows = useMemo(() => {
     const q = f.q.trim().toLowerCase()
     const out = (state.contracts || []).filter(c =>
       (!f.status.length || f.status.includes(c.status)) && (!f.type.length || f.type.includes(c.type_id)) &&
-      (!f.owner.length || f.owner.includes(c.owner_id)) && (!f.dept.length || f.dept.includes(c.department)) &&
+      (!f.owner.length || f.owner.includes(c.owner_id)) &&
       (!f.vendor.length || f.vendor.includes(c.counterparty_id)) &&
       (!f.valueMin || (c.value_amount != null && c.value_amount >= Number(f.valueMin))) &&
       (!f.valueMax || (c.value_amount != null && c.value_amount <= Number(f.valueMax))) &&
@@ -76,7 +75,7 @@ export default function Contracts() {
       (!f.signedTo || (c.signed_date && c.signed_date <= f.signedTo)) &&
       (!f.renewFrom || (c.last_renewal_date && c.last_renewal_date >= f.renewFrom)) &&
       (!f.renewTo || (c.last_renewal_date && c.last_renewal_date <= f.renewTo)) &&
-      (!q || [c.title, c.system_name, c.counterparty?.name, c.notes, c.department, c.department_manager, c.administrators, c.signatory_name, ...(c.tags || [])].some(v => v?.toLowerCase().includes(q))))
+      (!q || [c.title, c.system_name, c.counterparty?.name, c.notes, c.administrators, c.signatory_name, ...(c.tags || [])].some(v => v?.toLowerCase().includes(q))))
     if (NUMERIC_SORT_KEYS.has(sort.key)) {
       const num = c => ({ value: c.value_amount }[sort.key])
       return out.sort((a, b) => {
@@ -90,7 +89,7 @@ export default function Contracts() {
     const val = c => ({ title: c.title, counterparty: c.counterparty?.name, type: c.type?.name, status: c.status, owner: ownerName(c.owner_id),
       notice: c.notice_deadline || '9999', expires: c.expiration_date || '9999' }[sort.key] ?? '')
     return out.sort((a, b) => String(val(a)).localeCompare(String(val(b))) * sort.dir)
-    // Multi-select filters (f.status/type/owner/dept/vendor) are new arrays every render, so key
+    // Multi-select filters (f.status/type/owner/vendor) are new arrays every render, so key
     // off the URL's own string form instead of the arrays themselves.
   }, [state, params.toString(), sort])
 
@@ -176,10 +175,6 @@ export default function Contracts() {
               <FilterField label="Owner">
                 <MultiSelect value={f.owner} onChange={arr => setMulti('owner', arr)} placeholder="All owners"
                   options={(state.directory || []).map(p => ({ value: p.id, label: p.display_name }))} />
-              </FilterField>
-              <FilterField label="Department">
-                <MultiSelect value={f.dept} onChange={arr => setMulti('dept', arr)} placeholder="All departments"
-                  options={departments.map(d => ({ value: d, label: d }))} />
               </FilterField>
               <FilterField label="Vendor">
                 <MultiSelect value={f.vendor} onChange={arr => setMulti('vendor', arr)} placeholder="All vendors"

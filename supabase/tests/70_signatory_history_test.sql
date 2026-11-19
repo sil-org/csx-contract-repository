@@ -71,13 +71,13 @@ select t_eq('same start_date: the more recently recorded entry wins the tie', (s
 
 -- ── missing-data check (07) still reads the synced cache, unchanged ─────────
 select t_eq('signatory is not "missing" while a current entry exists',
-  (select contract_missing_attrs(contracts) @> array['Signatory name'] from contracts where id = :'c1'), false);
+  (select contract_missing_attrs(contracts) @> array['SIL signer'] from contracts where id = :'c1'), false);
 
 -- ── deleting all history clears the cache, and the missing-data check notices ──
 delete from contract_signatories where contract_id = :'c1';
 select t_eq('no history left: signatory reverts to null', (select signatory_name from contracts where id = :'c1'), null::text);
 select t_eq('signatory is "missing" once there is no current entry',
-  (select contract_missing_attrs(contracts) @> array['Signatory name', 'Signatory email'] from contracts where id = :'c1'), true);
+  (select contract_missing_attrs(contracts) @> array['SIL signer', 'SIL signer email'] from contracts where id = :'c1'), true);
 
 -- ── audited like every other contract child table ────────────────────────────
 insert into contract_signatories (contract_id, name, start_date) values (:'c1', 'Pat Manager', date '2026-01-01');

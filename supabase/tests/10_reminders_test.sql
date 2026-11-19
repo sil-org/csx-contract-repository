@@ -26,10 +26,14 @@ declare v_type uuid := (select id from contract_types where form_kind = 'vendor'
 begin
   insert into contracts (id, title, type_id, counterparty_id, owner_id, backup_owner_id, department,
                          effective_date, signed_date, expiration_date, evergreen, notice_period_days,
-                         reminders_enabled)
+                         reminders_enabled, created_at)
   values (p_id, 'Contract ' || left(p_id::text, 4), v_type, '00000000-0000-0000-0000-0000000000c1',
           '00000000-0000-0000-0000-0000000000a1', p_backup, 'Ops',
-          date '2026-01-01', date '2025-12-15', p_exp, p_evergreen, p_notice, p_reminders);
+          date '2026-01-01', date '2025-12-15', p_exp, p_evergreen, p_notice, p_reminders,
+          -- Pinned to the far future so the missing-data reminders (which recur from created_at) never
+          -- co-fire here; they are covered by 60_notification_requirements_test.sql. Without this the
+          -- expectations depended on the real date the suite was run on.
+          timestamptz '2099-01-01');
   insert into contract_documents (contract_id, doc_key, version, role, filename, content_type, size_bytes,
                                   sha256, s3_key, s3_version_id, change_note)
   values (p_id, gen_random_uuid(), 1, 'original', 'x.pdf', 'application/pdf', 10,

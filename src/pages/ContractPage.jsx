@@ -18,13 +18,13 @@ import { useAuth, useCan } from '../context/AuthContext'
 // "Essentials" card up top is the quick-add; everything below it can be filled in later.
 
 const EMPTY = {
-  title: '', type_id: '', counterparty: '', owner_id: '', backup_owner_id: '', department: '',
+  title: '', type_id: '', counterparty: '', owner_id: '', backup_owner_id: '',
   status: 'draft', effective_date: '', signed_date: '', expiration_date: '', evergreen: false,
   sensitivity: 'standard', tags: '', notes: '',
   renewal_type: 'none', renewal_term: '', notice_period_days: '', termination_for_convenience: '', termination_notice_days: '',
   value_amount: '', currency: 'USD', payment_terms: '', billing_frequency: '', budget_code: '',
   amends_id: '', superseded_by_id: '', reminders_enabled: true, details: {}, provisions: {},
-  system_name: '', department_manager: '', department_manager_email: '', annual_amount: '', annual_amount_note: '', mission_justification: '',
+  system_name: '', counterparty_signer_name: '', counterparty_signed_date: '', annual_amount: '', annual_amount_note: '', mission_justification: '',
   initial_contract_date: '', signatory_name: '', signatory_email: '', last_renewal_date: '', notice_terms: '', administrators: '',
   corporate_license: '', sign_on_methods: [], pricing_info: '', vendor_contact_note: '',
   no_original_exception: false, no_original_reason: '',
@@ -123,8 +123,9 @@ export default function ContractPage({ edit = false }) {
   const setDetail = (k, v) => setForm(f => ({ ...f, details: { ...f.details, [k]: v } }))
   const kind = ref.types.find(t => t.id === form.type_id)?.form_kind || 'other'
   const d = form.details || {}
+  // "Vendor" fits a vendor contract; for an MOU or SOW the same field is simply the other party.
+  const party = kind === 'vendor' ? 'Vendor' : 'Other party'
   const nameOf = pid => ref.directory.find(p => p.id === pid)?.display_name
-  const departments = [...new Set(ref.contracts.map(c => c.department).filter(Boolean))].sort()
   const people = ref.directory.map(p => [p.id, p.display_name])
   const contractOpts = ref.contracts.filter(c => c.id !== id).map(c => [c.id, `${c.title} — ${c.counterparty?.name}`])
   const originals = docs.filter(x => x.role === 'original').sort((a, b) => b.version - a.version)
@@ -189,7 +190,7 @@ export default function ContractPage({ edit = false }) {
       const counterparty_id = await findOrCreateCounterparty(form.counterparty)
       const fields = {
         title: form.title.trim(), type_id: form.type_id, counterparty_id, owner_id: form.owner_id,
-        backup_owner_id: nz(form.backup_owner_id), department: form.department.trim(),
+        backup_owner_id: nz(form.backup_owner_id),
         effective_date: nz(form.effective_date), signed_date: nz(form.signed_date),
         expiration_date: nz(form.expiration_date), evergreen: form.evergreen,
         sensitivity: form.sensitivity,
@@ -202,8 +203,8 @@ export default function ContractPage({ edit = false }) {
         payment_terms: nz(form.payment_terms), billing_frequency: nz(form.billing_frequency), budget_code: nz(form.budget_code),
         amends_id: nz(form.amends_id), superseded_by_id: nz(form.superseded_by_id),
         reminders_enabled: form.reminders_enabled, details: form.details, provisions: form.provisions,
-        system_name: nz(form.system_name), department_manager: nz(form.department_manager),
-        department_manager_email: nz(form.department_manager_email),
+        system_name: nz(form.system_name),
+        counterparty_signer_name: nz(form.counterparty_signer_name), counterparty_signed_date: nz(form.counterparty_signed_date),
         annual_amount: num(form.annual_amount), annual_amount_note: nz(form.annual_amount_note),
         mission_justification: nz(form.mission_justification), initial_contract_date: nz(form.initial_contract_date),
         // Signatory is written here only on creation, to seed day one; after that it's a cache kept
@@ -322,19 +323,7 @@ export default function ContractPage({ edit = false }) {
           <Group title="The contract">
             {fld('title', 'Title', { req: true, cls: 'col-span-2' })}
             {fld('type_id', 'Contract type', { req: true, noBlank: true, options: ref.types.map(t => [t.id, t.name]) })}
-            {editing ? (
-              <Field label="Vendor" required hint="Pick an existing one to avoid duplicates, or type a new name.">
-                <input className={inputCls} list="counterparties" required value={form.counterparty} onChange={e => set('counterparty', e.target.value)} />
-                <datalist id="counterparties">{ref.counterparties.map(c => <option key={c.id} value={c.name} />)}</datalist>
-              </Field>
-            ) : fld('counterparty', 'Vendor', { req: true })}
             {fld('owner_id', 'Internal owner', { req: true, options: people, view: v => nameOf(v), hint: 'Receives this contract’s reminders. Not listed? An admin adds them under Users & roles first.' })}
-            {editing ? (
-              <Field label="Department / program" required>
-                <input className={inputCls} list="departments" required value={form.department} onChange={e => set('department', e.target.value)} />
-                <datalist id="departments">{departments.map(x => <option key={x} value={x} />)}</datalist>
-              </Field>
-            ) : fld('department', 'Department / program', { req: true })}
             {id && editing && fld('status', 'Status', { noBlank: true, options: Object.entries(STATUS_LABELS), hint: 'Active needs an executed original, plus effective and signed dates.' })}
           </Group>
 
@@ -345,11 +334,18 @@ export default function ContractPage({ edit = false }) {
             <div className="col-span-2"><ConfidentialNote /></div>
           </Group>
 
-          <Group title="Signers" note={id && editing ? 'The signatory changes through Signatory history below, so there is one dated record of who was responsible when.' : undefined}>
-            {fld('signatory_name', id ? 'Current signatory' : 'Signatory name', { req: !id, disabled: !!id })}
-            {fld('signatory_email', 'Signatory email', { req: !id, type: 'email', disabled: !!id })}
-            {fld('department_manager', 'Department manager', { req: true })}
-            {fld('department_manager_email', 'Department manager email', { req: true, type: 'email' })}
+          <Group title="Signers" note={id && editing ? 'The SIL signer changes through Signatory history below, so there is one dated record of who was responsible when.' : undefined}>
+            {editing ? (
+              <Field label={party} required hint={kind === 'vendor' ? 'Pick an existing one to avoid duplicates, or type a new name.' : 'The organization that signs with SIL.'} className="col-span-2">
+                <input className={inputCls} list="counterparties" required value={form.counterparty} onChange={e => set('counterparty', e.target.value)} />
+                <datalist id="counterparties">{ref.counterparties.map(c => <option key={c.id} value={c.name} />)}</datalist>
+              </Field>
+            ) : fld('counterparty', party, { req: true, cls: 'col-span-2' })}
+            {fld('signatory_name', id ? 'Current SIL signer' : 'SIL signer', { req: !id, disabled: !!id })}
+            {fld('signed_date', 'SIL signed on', { req: true, type: 'date', view: v => v && fmtDate(v) })}
+            {fld('signatory_email', 'SIL signer email', { req: !id, type: 'email', disabled: !!id, cls: 'col-span-2' })}
+            {fld('counterparty_signer_name', `${party} signer`, { req: true })}
+            {fld('counterparty_signed_date', `${party} signed on`, { req: true, type: 'date', view: v => v && fmtDate(v) })}
           </Group>
 
           <Group title="Dates">
@@ -357,7 +353,6 @@ export default function ContractPage({ edit = false }) {
             {fld('contract_length_years', 'Contract length (years)', { req: true, type: 'number', step: '0.1', min: 0,
               view: v => v !== '' && `${v} year${Number(v) === 1 ? '' : 's'}` })}
             {fld('effective_date', 'Effective date', { req: true, type: 'date', view: v => v && fmtDate(v) })}
-            {fld('signed_date', 'Signed date (current term)', { req: true, type: 'date', view: v => v && fmtDate(v) })}
             {fld('expiration_date', 'Expiration / next renewal date', { req: !form.evergreen, type: 'date', disabled: form.evergreen,
               view: (v, f) => (f.evergreen ? 'Evergreen — no fixed end date' : v && fmtDate(v)) })}
             {fld('notice_period_days', 'Notice period (days)', { req: true, type: 'number', min: 0,
@@ -448,7 +443,7 @@ export default function ContractPage({ edit = false }) {
                 </p>
               )}
             </div>
-            {fld('vendor_contact_note', 'Vendor contact rule', { hint: 'e.g. “Do not contact the vendor without speaking to the department manager.”',
+            {fld('vendor_contact_note', 'Vendor contact rule', { hint: 'e.g. “Do not contact the vendor without speaking to the contract owner.”',
               view: v => v && <strong className="text-amber-800">{v}</strong> })}
             <div className="md:col-span-2">
               {editing
