@@ -44,27 +44,31 @@ await t.page.getByText('Initial contract').first().waitFor({ timeout: 8000 })
 const body = await t.page.locator('main').innerText()
 for (const [label, needle] of [
   ['system', 'Freshworks CRM (Customer Relationship Management)'], ['department manager', 'Roy Eyre'], ['initial contract date', 'Nov 6, 2020'], ['current signatory', 'Sheryl Howe'],
-  ['last renewal date', 'Nov 10, 2025'], ['next renewal date (label)', 'Expires / next renewal'], ['notice terms as written', '60 days'], ['last day to cancel', 'Sep 11, 2026'],
+  ['last renewal date', 'Nov 10, 2025'], ['next renewal date (label)', 'Expiration / next renewal date'], ['notice terms as written', '60 days'], ['last day to cancel', 'Sep 11, 2026'],
   ['annual amount + thousands', '$35,000.00 (≈ $35k)'], ['annual amount notes', 'quoted as $35k'], ['mission paragraph', 'our donors are critical to our mission'],
-  ['administrators', 'crm-admin@sil.org'], ['pricing info', 'See most recent pricing'], ['corporate license yes', 'Corporate license'], ['vendor contact rule', 'Do not contact the vendor without speaking to the department manager'],
+  ['administrators', 'crm-admin@sil.org'], ['pricing info', 'See most recent pricing'], ['corporate license yes', 'Corporate (organization-wide) license?'], ['vendor contact rule', 'Do not contact the vendor without speaking to the department manager'],
   ['confidentiality notice', 'not to be shared with vendors or outside SIL'], ['drive link in notes', 'drive.google.com/open?id=17jQN']]) check('detail shows ' + label, body.includes(needle))
+check('detail has the Essentials quick-add card and an Edit button (and no Save)', await t.page.getByRole('heading', { name: 'Essentials' }).isVisible()
+  && await t.page.getByRole('link', { name: 'Edit' }).count() === 1 && await t.page.getByRole('button', { name: 'Save changes' }).count() === 0)
+check('detail flags the missing signed original', body.includes('Not uploaded yet'))
 check('no errors on detail', t.errors.length === 0); if (t.errors.length) console.log(t.errors)
 await t.close()
 
 // ---- edit form loads values and saves them with the right types ----
 t = await open('/contracts/' + C1 + '/edit')
-await t.page.getByText('System and subscription details').waitFor({ timeout: 8000 })
-const val = async label => t.page.locator('label', { hasText: label }).locator('input, textarea, select').first().inputValue()
+await t.page.getByRole('heading', { name: 'System & subscription' }).waitFor({ timeout: 8000 })
+const val = async label => t.page.locator('label', { hasText: label }).first().locator('input, textarea, select').first().inputValue()
 check('form loads department manager', await val('Department manager') === 'Roy Eyre')
-check('form loads annual amount', await val('Annual amount (vendor license only)') === '35000')
-check('form loads signatory name', await val('Signatory name') === 'Sheryl Howe')
+check('form loads annual amount', await val('Annual amount') === '35000')
+check('form loads signatory name', await val('Current signatory') === 'Sheryl Howe')
 check('form loads corporate license = Yes and Google sign-on checked', await val('Corporate (organization-wide) license?') === 'true'
   && await t.page.locator('label', { hasText: 'Google' }).locator('input[type=checkbox]').isChecked())
 check('form loads mission paragraph', (await val('Rationale: Why this software advances our mission')).includes('donors'))
+await t.page.locator('label', { hasText: 'Department manager email' }).locator('input').fill('roy@sil.org')
 await t.page.locator('label', { hasText: 'Annual amount: notes' }).locator('input').fill('  quoted as $35k + 2% fees  ')
 await t.page.locator('label', { hasText: 'Administrator(s)' }).locator('input').fill('')
 await t.page.locator('label', { hasText: 'Google' }).locator('input[type=checkbox]').uncheck()
-await t.page.getByRole('button', { name: 'Save changes' }).click()
+await t.page.getByRole('button', { name: 'Save changes' }).first().click()
 await t.page.waitForURL('**/contracts/' + C1, { timeout: 8000 })
 const w = writes.at(-1)?.body || {}
 check('save sends a PATCH to contracts', writes.at(-1)?.method === 'PATCH')
@@ -81,21 +85,27 @@ await t.close()
 // ---- new contract form: fields present for a software type; required fields must be filled,
 // still-optional sheet fields are saved as null/empty when left untouched ----
 t = await open('/contracts/new')
-await t.page.getByText('System and subscription details').waitFor({ timeout: 8000 })
+await t.page.getByRole('heading', { name: 'System & subscription' }).waitFor({ timeout: 8000 })
 await t.page.locator('label', { hasText: 'Title' }).first().locator('input').fill('Zoom')
 await t.page.locator('label', { hasText: 'Vendor' }).first().locator('input').fill('Zoom')
 await t.page.locator('label', { hasText: 'Department / program' }).locator('input').fill('GTIS')
+await t.page.locator('label', { hasText: 'Department manager' }).first().locator('input').fill('Pat Manager')
+await t.page.locator('label', { hasText: 'Department manager email' }).locator('input').fill('pat@sil.org')
 await t.page.locator('label', { hasText: 'Internal owner' }).locator('select').selectOption(ME)
+await t.page.locator('label', { hasText: 'Notice period' }).locator('input').fill('30')
 await t.page.locator('label', { hasText: 'Initial contract date' }).locator('input').fill('2026-01-01')
 await t.page.locator('label', { hasText: 'Signatory name' }).locator('input').fill('Jo Signer')
 await t.page.locator('label', { hasText: 'Signatory email' }).locator('input').fill('jo@zoom.example')
-await t.page.locator('label', { hasText: 'Signed date (current term)' }).locator('input').fill('2026-01-01')
+await t.page.locator('label', { hasText: 'Signed date' }).locator('input').fill('2026-01-01')
 await t.page.locator('label', { hasText: 'Effective date' }).locator('input').fill('2026-01-01')
 await t.page.locator('label', { hasText: 'Expiration / next renewal date' }).locator('input').fill('2027-01-01')
 await t.page.locator('label', { hasText: 'Contract length (years)' }).locator('input').fill('1')
-await t.page.locator('label', { hasText: 'Annual amount (vendor license only)' }).locator('input').fill('1000')
+await t.page.locator('label', { hasText: 'Annual amount' }).first().locator('input').fill('1000')
 await t.page.locator('label', { hasText: 'Rationale: Why this software advances our mission' }).locator('textarea').fill('Needed for day-to-day operations.')
-await t.page.getByRole('button', { name: 'Create contract' }).click()
+await t.page.locator('input[type=file]').first().setInputFiles({ name: 'signed.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') })
+check('new contract: chosen original is shown as pending upload', await t.page.getByText('uploads when you save').isVisible())
+await t.page.locator('input[type=file]').first().setInputFiles([]) // the mock API has no S3/contract-documents, so save without it
+await t.page.getByRole('button', { name: 'Create contract' }).first().click()
 await t.page.waitForURL('**/contracts/' + C1, { timeout: 8000 })
 const n = writes.at(-1)?.body || {}
 check('new contract: POST', writes.at(-1)?.method === 'POST')

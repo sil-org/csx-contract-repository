@@ -4,8 +4,7 @@ import AuthCallback from './pages/AuthCallback'
 import NoAccess from './pages/NoAccess'
 import Dashboard from './pages/Dashboard'
 import Contracts from './pages/Contracts'
-import ContractForm from './pages/ContractForm'
-import ContractDetail from './pages/ContractDetail'
+import ContractPage from './pages/ContractPage'
 import AdminUsers from './pages/admin/Users'
 import AdminSettings from './pages/admin/Settings'
 import ReminderLog from './pages/admin/ReminderLog'
@@ -30,9 +29,9 @@ export default function App() {
 
       <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
       <Route path="/contracts" element={<RequireAuth><Contracts /></RequireAuth>} />
-      <Route path="/contracts/new" element={<RequireAuth roles={['contributor', 'admin']}><ContractForm /></RequireAuth>} />
-      <Route path="/contracts/:id" element={<RequireAuth><ContractDetail /></RequireAuth>} />
-      <Route path="/contracts/:id/edit" element={<RequireAuth roles={['contributor', 'admin']}><ContractForm /></RequireAuth>} />
+      <Route path="/contracts/new" element={<RequireAuth roles={['contributor', 'admin']}><ContractPage edit /></RequireAuth>} />
+      <Route path="/contracts/:id" element={<RequireAuth><ContractPage /></RequireAuth>} />
+      <Route path="/contracts/:id/edit" element={<RequireAuth roles={['contributor', 'admin']}><ContractPage edit /></RequireAuth>} />
 
       <Route path="/admin" element={<RequireAuth roles={['admin', 'auditor']}><AdminIndex /></RequireAuth>} />
       <Route path="/admin/users" element={<RequireAuth roles={['admin']}><AdminUsers /></RequireAuth>} />
