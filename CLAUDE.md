@@ -219,16 +219,16 @@ keep the positive-control checks, and for a new rule, break it on purpose once t
   every mode; view shows each field as text, edit swaps in the input (`fld()` helper). Edit button only
   for admins and the contract's owner/backup; Save/Cancel only in edit mode. No migration needed.
   - Top **Essentials** card is the quick-add: title/type/vendor/owner/department, annual amount + total
-    value, signatory + department manager (name + email), effective/signed/expiration dates + notice
-    period (shows the computed last day to give notice), **Rationale**, and the **signed original** (PDF
+    value, signatory + department manager (name + email), initial contract date, effective/signed/expiration
+    dates, contract length + notice period (shows the computed last day to give notice), **Rationale**, and the **signed original** (PDF
     picker; uploaded right after the contract saves, as a new version if one already exists; if the upload
     fails the contract is still saved and the edit page shows why).
   - Everything else is "add later" cards below: Ownership & visibility (backup owner, visibility, tags,
     reminders, admin original exception), Financial details, System & subscription, Renewal & termination
-    (now incl. initial contract date and contract length), type details, Related & provisions — then the
+    type details, Related & provisions — then the
     existing self-saving panels (documents, milestones, links, signatory history, history).
   - Required-on-create is now just the Essentials (client-side only). Newly required: department manager
-    name/email. No longer required: initial contract date, contract length. Signatory is still editable
+    name/email. Signatory is still editable
     only on create. UI tests updated (`tests/ui/sheet_fields.mjs`, `pages.mjs`); same one pre-existing
     `?decide=1` failure in `pages.mjs`.
 - **Open decision:** whether the sheet's "Other Systems" tab (many rows with no contract) is imported, and as

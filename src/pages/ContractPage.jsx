@@ -353,6 +353,9 @@ export default function ContractPage({ edit = false }) {
           </Group>
 
           <Group title="Dates">
+            {fld('initial_contract_date', 'Initial contract date', { req: true, type: 'date', hint: 'When the very first agreement was made.', view: v => v && fmtDate(v) })}
+            {fld('contract_length_years', 'Contract length (years)', { req: true, type: 'number', step: '0.1', min: 0,
+              view: v => v !== '' && `${v} year${Number(v) === 1 ? '' : 's'}` })}
             {fld('effective_date', 'Effective date', { req: true, type: 'date', view: v => v && fmtDate(v) })}
             {fld('signed_date', 'Signed date (current term)', { req: true, type: 'date', view: v => v && fmtDate(v) })}
             {fld('expiration_date', 'Expiration / next renewal date', { req: !form.evergreen, type: 'date', disabled: form.evergreen,
@@ -461,10 +464,7 @@ export default function ContractPage({ edit = false }) {
 
       <Section id="terms" title="Renewal & termination" hint="Add later">
         <div className="grid md:grid-cols-3 gap-4">
-          {fld('initial_contract_date', 'Initial contract date', { type: 'date', hint: 'When the very first agreement was made.', view: v => v && fmtDate(v) })}
           {fld('last_renewal_date', 'Last renewal date', { type: 'date', view: v => v && fmtDate(v) })}
-          {fld('contract_length_years', 'Contract length (years)', { type: 'number', step: '0.1', min: 0,
-            view: v => v !== '' && `${v} year${Number(v) === 1 ? '' : 's'}` })}
           {fld('renewal_type', 'Renewal type', { noBlank: true, options: Object.entries(RENEWAL_LABELS) })}
           {fld('renewal_term', 'Renewal term', { hint: 'e.g. 12 months' })}
           {fld('notice_terms', 'Renewal notice terms (as written)', { hint: 'e.g. “60 days written notice”. The number of days above drives the reminders.' })}
