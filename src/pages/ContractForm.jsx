@@ -1,27 +1,27 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
+import { FileText, DollarSign, CalendarDays, Settings2, ListChecks, MoreHorizontal } from 'lucide-react'
 import { getContract, listTypes, listCounterparties, getDirectory, listContracts, findOrCreateCounterparty, saveContract, addSignatory } from '../lib/contracts'
-import { STATUS_LABELS, RENEWAL_LABELS, SIGN_ON_LABELS, PROVISIONS } from '../lib/format'
+import { STATUS_LABELS, RENEWAL_LABELS, SIGN_ON_LABELS } from '../lib/format'
 import { Page, Card, SectionNav, Field, ErrorMsg, Loading, btnPrimary, btnSecondary, inputCls } from '../components/ui'
-import { useAuth, useCan } from '../context/AuthContext'
+import { useAuth } from '../context/AuthContext'
 import { ConfidentialNote } from '../components/ui'
 
 const EMPTY = {
-  title: '', type_id: '', counterparty: '', owner_id: '', backup_owner_id: '', department: '',
+  title: '', type_id: '', counterparty: '', owner_id: '', department: '',
   status: 'draft', effective_date: '', signed_date: '', expiration_date: '', evergreen: false,
   sensitivity: 'standard', tags: '', notes: '',
-  renewal_type: 'none', renewal_term: '', notice_period_days: 0, termination_for_convenience: '', termination_notice_days: '',
+  renewal_type: 'none', renewal_term: '', notice_period_days: 30, termination_for_convenience: '', termination_notice_days: '',
   value_amount: '', currency: 'USD', payment_terms: '', billing_frequency: '', budget_code: '',
-  amends_id: '', superseded_by_id: '', reminders_enabled: true, details: {}, provisions: {},
+  details: {},
   // Fields from the existing tracking sheet
-  system_name: '', department_manager: '', department_manager_email: '', annual_amount: '', annual_amount_note: '', mission_justification: '',
-  initial_contract_date: '', signatory_name: '', signatory_email: '', last_renewal_date: '', notice_terms: '', administrators: '',
+  system_name: '', annual_amount: '', annual_amount_note: '', mission_justification: '',
+  signatory_name: '', signatory_email: '', last_renewal_date: '', administrators: '',
   corporate_license: '', sign_on_methods: [], pricing_info: '', vendor_contact_note: '',
-  no_original_exception: false, no_original_reason: '',
   // New data-element list (2026-11-09)
-  contract_length_years: '', custom_msa: false,
+  custom_msa: false,
   // Notification requirements (2026-11-11)
-  termination_date: '', amended_date: '', amendment_description: '',
+  termination_date: '',
 }
 
 const nz = v => (v === '' || v === undefined ? null : (typeof v === 'string' ? (v.trim() === '' ? null : v.trim()) : v))
@@ -33,7 +33,6 @@ export default function ContractForm() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { profile } = useAuth()
-  const can = useCan()
   const [form, setForm] = useState({ ...EMPTY, owner_id: profile?.id || '' })
   const [ref, setRef] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -47,7 +46,7 @@ export default function ContractForm() {
         if (id) {
           if (!existing) throw new Error('Contract not found, or you do not have access to it.')
           setForm({ ...EMPTY, ...Object.fromEntries(Object.entries(existing).map(([k, v]) => [k, v ?? EMPTY[k] ?? ''])),
-            counterparty: existing.counterparty?.name || '', tags: (existing.tags || []).join(', '),
+            counterparty: existing.counterparty?.name || '', tags: (existing.tags || []).join(', '), details: existing.details || {},
             termination_for_convenience: triIn(existing.termination_for_convenience),
             corporate_license: triIn(existing.corporate_license), sign_on_methods: existing.sign_on_methods || [] })
         } else {
@@ -69,13 +68,10 @@ export default function ContractForm() {
     setSaving(true); setError(null)
     try {
       if (!form.counterparty.trim()) throw new Error('Vendor is required.')
-      if (can.admin && form.no_original_exception && !form.no_original_reason.trim()) {
-        throw new Error('A reason is required to mark the original as not on file.')
-      }
       const counterparty_id = await findOrCreateCounterparty(form.counterparty)
       const fields = {
         title: form.title.trim(), type_id: form.type_id, counterparty_id, owner_id: form.owner_id,
-        backup_owner_id: nz(form.backup_owner_id), department: form.department.trim(),
+        department: form.department.trim(),
         effective_date: nz(form.effective_date), signed_date: nz(form.signed_date),
         expiration_date: nz(form.expiration_date), evergreen: form.evergreen,
         sensitivity: form.sensitivity,
@@ -86,26 +82,24 @@ export default function ContractForm() {
         termination_notice_days: nz(form.termination_notice_days) === null ? null : Number(form.termination_notice_days),
         value_amount: nz(form.value_amount) === null ? null : Number(form.value_amount), currency: nz(form.currency),
         payment_terms: nz(form.payment_terms), billing_frequency: nz(form.billing_frequency), budget_code: nz(form.budget_code),
-        amends_id: nz(form.amends_id), superseded_by_id: nz(form.superseded_by_id),
-        reminders_enabled: form.reminders_enabled, details: form.details, provisions: form.provisions,
-        system_name: nz(form.system_name), department_manager: nz(form.department_manager),
-        department_manager_email: nz(form.department_manager_email),
+        // Reminders always run now — there's no per-contract opt-out any more.
+        reminders_enabled: true, details: form.details,
+        system_name: nz(form.system_name),
         annual_amount: nz(form.annual_amount) === null ? null : Number(form.annual_amount), annual_amount_note: nz(form.annual_amount_note),
-        mission_justification: nz(form.mission_justification), initial_contract_date: nz(form.initial_contract_date),
+        mission_justification: nz(form.mission_justification),
         // Signatory is written here only on creation, to seed day one; after that it's a cache kept
         // in sync from contract_signatories (see Signatory history on the contract page), not editable here.
         ...(id ? {} : { signatory_name: nz(form.signatory_name), signatory_email: nz(form.signatory_email) }),
-        last_renewal_date: nz(form.last_renewal_date), notice_terms: nz(form.notice_terms),
+        last_renewal_date: nz(form.last_renewal_date),
         administrators: nz(form.administrators), corporate_license: triOut(form.corporate_license), sign_on_methods: form.sign_on_methods,
         pricing_info: nz(form.pricing_info), vendor_contact_note: nz(form.vendor_contact_note),
-        contract_length_years: nz(form.contract_length_years) === null ? null : Number(form.contract_length_years),
         custom_msa: form.custom_msa,
-        termination_date: nz(form.termination_date), amended_date: nz(form.amended_date),
-        amendment_description: nz(form.amendment_description),
+        termination_date: nz(form.termination_date),
         ...(id ? { status: form.status } : {}),
-        // Only admins may grant/revoke this (enforced in the DB too); leaving these out of
-        // the payload for non-admins keeps their edits from touching an existing exception.
-        ...(can.admin ? { no_original_exception: form.no_original_exception, no_original_reason: nz(form.no_original_reason) } : {}),
+        // Backup owner, department manager (+ email), contract length, the written-out renewal/notice
+        // terms and the initial contract date are no longer editable here (visual-refresh redesign,
+        // 2026-11-19) — omitted rather than sent as null, so existing values on an edited contract are
+        // left exactly as they are; they just can't be set or changed through this form any more.
       }
       const saved = await saveContract(id, fields)
       if (!id && form.signatory_name.trim()) {
@@ -114,7 +108,7 @@ export default function ContractForm() {
         try {
           await addSignatory(saved.id, {
             name: form.signatory_name.trim(), email: nz(form.signatory_email),
-            start_date: form.initial_contract_date || new Date().toISOString().slice(0, 10),
+            start_date: new Date().toISOString().slice(0, 10),
           }, profile?.id)
         } catch (x) { console.error('could not record the initial signatory history entry', x) }
       }
@@ -129,19 +123,18 @@ export default function ContractForm() {
 
   const text = (k, props = {}) => <input className={inputCls} value={form[k] ?? ''} onChange={e => set(k, e.target.value)} {...props} />
   const people = ref.directory.map(p => <option key={p.id} value={p.id}>{p.display_name}</option>)
-  const others = ref.contracts.filter(c => c.id !== id)
-  const contractOpts = others.map(c => <option key={c.id} value={c.id}>{c.title} — {c.counterparty?.name}</option>)
   const departments = [...new Set(ref.contracts.map(c => c.department).filter(Boolean))].sort()
 
-  const typeDetailsLabel = { mou: 'MOU details', sow: 'SOW details', vendor: 'Vendor details' }[kind]
+  const typeDetailsLabel = { mou: 'MOU details', sow: 'SOW details' }[kind]
+  const showFinancial = kind === 'vendor' || kind === 'sow' || kind === 'other'
+  const showAdministration = kind === 'vendor' || kind === 'other'
   const navItems = [
     { id: 'basics', label: 'Basics' },
+    { id: 'financial', label: 'Financial', show: showFinancial },
     { id: 'dates', label: 'Dates and renewal' },
-    { id: 'exception', label: 'Activation exception', show: can.admin },
-    { id: 'financial', label: 'Financial', show: kind === 'vendor' || kind === 'sow' || kind === 'other' },
-    { id: 'system', label: 'System and subscription', show: kind === 'vendor' || kind === 'other' },
+    { id: 'administration', label: 'Administration', show: showAdministration },
     { id: 'type-details', label: typeDetailsLabel, show: !!typeDetailsLabel },
-    { id: 'relationships', label: 'Relationships and provisions' },
+    { id: 'more', label: 'More' },
   ]
 
   return (
@@ -151,12 +144,9 @@ export default function ContractForm() {
         <SectionNav items={navItems} orientation="left" title={id ? form.title : undefined} />
         <div className="flex-1 min-w-0">
       <form onSubmit={submit}>
-        <Card title="Basics" id="basics">
+        <Card title="Basics" id="basics" icon={FileText}>
           <div className="grid md:grid-cols-2 gap-4">
             <Field label="Title" required className="md:col-span-2">{text('title', { required: true })}</Field>
-            <Field label="System / product" hint="e.g. Zoom, Freshworks CRM — the thing the contract is for.">{text('system_name')}</Field>
-            <Field label="Department manager">{text('department_manager')}</Field>
-            <Field label="Department manager email">{text('department_manager_email', { type: 'email' })}</Field>
             <Field label="Contract type" required>
               <select className={inputCls} required value={form.type_id} onChange={e => set('type_id', e.target.value)}>
                 {ref.types.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -166,91 +156,36 @@ export default function ContractForm() {
               <input className={inputCls} list="counterparties" required value={form.counterparty} onChange={e => set('counterparty', e.target.value)} />
               <datalist id="counterparties">{ref.counterparties.map(c => <option key={c.id} value={c.name} />)}</datalist>
             </Field>
+            <Field label="Vendor contact" hint="A name at the vendor."><input className={inputCls} value={d.vendor_contact || ''} onChange={e => setDetail('vendor_contact', e.target.value)} /></Field>
+            <Field label="Vendor email"><input type="email" className={inputCls} value={d.vendor_email || ''} onChange={e => setDetail('vendor_email', e.target.value)} /></Field>
             <Field label="Internal owner" required hint="Accountable person; receives this contract's reminders. Not listed? An admin adds them under Users & roles first.">
               <select className={inputCls} required value={form.owner_id} onChange={e => set('owner_id', e.target.value)}>
                 <option value="">Select…</option>{people}
-              </select>
-            </Field>
-            <Field label="Backup owner" hint="Also receives reminders, and escalations.">
-              <select className={inputCls} value={form.backup_owner_id} onChange={e => set('backup_owner_id', e.target.value)}>
-                <option value="">None</option>{people}
               </select>
             </Field>
             <Field label="Department / program" required hint="Pick an existing one, or type a new name.">
               <input className={inputCls} list="departments" required value={form.department} onChange={e => set('department', e.target.value)} />
               <datalist id="departments">{departments.map(d => <option key={d} value={d} />)}</datalist>
             </Field>
+            <Field label="System / product" hint="e.g. Zoom, Freshworks CRM — the thing the contract is for.">{text('system_name')}</Field>
             {id && <Field label="Status" hint="Activating requires an uploaded executed original, plus effective and signed dates.">
               <select className={inputCls} value={form.status} onChange={e => set('status', e.target.value)}>
                 {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </Field>}
-            <Field label="Visibility" hint="Restricted: only the owner, backup, named people, admins and auditors can see it.">
-              <select className={inputCls} value={form.sensitivity} onChange={e => set('sensitivity', e.target.value)}>
-                <option value="standard">Standard</option><option value="restricted">Restricted</option>
-              </select>
-            </Field>
-            <Field label="Tags" hint="Comma-separated.">{text('tags')}</Field>
-            <Field label="Notes" className="md:col-span-2"><textarea className={inputCls} rows={3} value={form.notes} onChange={e => set('notes', e.target.value)} /></Field>
-          </div>
-        </Card>
-
-        <Card title="Dates and renewal" id="dates">
-          <div className="grid md:grid-cols-3 gap-4">
-            <Field label="Initial contract date" required hint="When the very first agreement was made.">{text('initial_contract_date', { type: 'date', required: true })}</Field>
-            <Field label="Signatory name" required={!id} hint={id ? 'Current signatory — add a dated change via Signatory history on the contract page, not here.' : undefined}>
-              {text('signatory_name', { required: !id, disabled: !!id })}
-            </Field>
-            <Field label="Signatory email" required={!id}>
-              {text('signatory_email', { type: 'email', required: !id, disabled: !!id })}
-            </Field>
-            <Field label="Last renewal date">{text('last_renewal_date', { type: 'date' })}</Field>
-            <Field label="Signed date (current term)" required>{text('signed_date', { type: 'date', required: true })}</Field>
-            <Field label="Effective date" required>{text('effective_date', { type: 'date', required: true })}</Field>
-            <Field label="Expiration / next renewal date" required={!form.evergreen} hint={form.evergreen ? 'Ignored while evergreen.' : 'The date the current term ends or renews.'}>{text('expiration_date', { type: 'date', disabled: form.evergreen, required: !form.evergreen })}</Field>
-            <label className="flex items-center gap-2 text-sm md:col-span-3">
-              <input type="checkbox" checked={form.evergreen} onChange={e => set('evergreen', e.target.checked)} /> Evergreen (no fixed end date)
+            <label className="flex items-center gap-2 text-sm self-end pb-2">
+              <input type="checkbox" checked={form.sensitivity === 'restricted'} onChange={e => set('sensitivity', e.target.checked ? 'restricted' : 'standard')} /> Restricted
             </label>
-            <Field label="Renewal type">
-              <select className={inputCls} value={form.renewal_type} onChange={e => set('renewal_type', e.target.value)}>
-                {Object.entries(RENEWAL_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
-            </Field>
-            <Field label="Renewal term" hint="e.g. 12 months">{text('renewal_term')}</Field>
-            <Field label="Contract length (years)" required>{text('contract_length_years', { type: 'number', step: '0.1', min: 0, required: true })}</Field>
-            <Field label="Notice period (days)" required hint="Days before expiry that notice of non-renewal/termination is due. Reminders count down to this deadline, not the expiry.">
-              {text('notice_period_days', { type: 'number', min: 0, required: true })}
-            </Field>
-            <Field label="Renewal notice terms (as written)" hint="e.g. “60 days written notice”. The number of days above drives the reminders.">{text('notice_terms')}</Field>
-            <Field label="Termination for convenience?">
-              <select className={inputCls} value={form.termination_for_convenience} onChange={e => set('termination_for_convenience', e.target.value)}>
-                <option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option>
-              </select>
-            </Field>
-            {form.termination_for_convenience === 'true' && <Field label="Termination notice (days)">{text('termination_notice_days', { type: 'number', min: 0 })}</Field>}
-            <Field label="Termination date" hint="What actually happened: when this contract was confirmed terminated or not renewed. Leave blank until that's decided.">{text('termination_date', { type: 'date' })}</Field>
-            <label className="flex items-center gap-2 text-sm md:col-span-3">
-              <input type="checkbox" checked={form.reminders_enabled} onChange={e => set('reminders_enabled', e.target.checked)} /> Send reminders for this contract
-            </label>
-          </div>
-        </Card>
-
-        {can.admin && (
-          <Card title="Activation exception (admin only)" id="exception">
-            <label className="flex items-center gap-2 text-sm mb-3">
-              <input type="checkbox" checked={form.no_original_exception} onChange={e => set('no_original_exception', e.target.checked)} />
-              Original not on file — allow this contract to become Active without an uploaded executed original
-            </label>
-            {form.no_original_exception && (
-              <Field label="Reason" required hint="Shown on the contract as a badge; required to activate without an original.">
-                <textarea className={inputCls} rows={2} required value={form.no_original_reason} onChange={e => set('no_original_reason', e.target.value)} />
+            {(kind === 'vendor' || kind === 'other') && (
+              <Field label="Rationale: Why this software advances our mission" required hint="One paragraph." className="md:col-span-2">
+                <textarea className={inputCls} rows={4} required value={form.mission_justification} onChange={e => set('mission_justification', e.target.value)} />
               </Field>
             )}
-          </Card>
-        )}
+          </div>
+        </Card>
 
-        {(kind === 'vendor' || kind === 'sow' || kind === 'other') && (
-          <Card title="Financial" id="financial">
+        {showFinancial && (
+          <Card title="Financial" id="financial" icon={DollarSign}>
             <ConfidentialNote />
             <div className="grid md:grid-cols-3 gap-4">
               <Field label="Annual amount (vendor license only)" required>{text('annual_amount', { type: 'number', step: '0.01', min: 0, required: true })}</Field>
@@ -264,12 +199,43 @@ export default function ContractForm() {
           </Card>
         )}
 
-        {(kind === 'vendor' || kind === 'other') && (
-          <Card title="System and subscription details" id="system">
+        <Card title="Dates and renewal" id="dates" icon={CalendarDays}>
+          <div className="grid md:grid-cols-3 gap-4">
+            <Field label="Signer" required={!id} hint={id ? 'Current signatory — add a dated change via Signatory history on the contract page, not here.' : undefined}>
+              {text('signatory_name', { required: !id, disabled: !!id })}
+            </Field>
+            <Field label="Signer email" required={!id}>
+              {text('signatory_email', { type: 'email', required: !id, disabled: !!id })}
+            </Field>
+            <Field label="Signed date (current term)" required>{text('signed_date', { type: 'date', required: true })}</Field>
+            <Field label="Start date" required>{text('effective_date', { type: 'date', required: true })}</Field>
+            <Field label="Last renewal date">{text('last_renewal_date', { type: 'date' })}</Field>
+            <Field label="Expiration / next renewal date" required={!form.evergreen} hint={form.evergreen ? 'Ignored while evergreen.' : 'The date the current term ends or renews.'}>{text('expiration_date', { type: 'date', disabled: form.evergreen, required: !form.evergreen })}</Field>
+            <label className="flex items-center gap-2 text-sm self-end pb-2">
+              <input type="checkbox" checked={form.evergreen} onChange={e => set('evergreen', e.target.checked)} /> Evergreen (no fixed end date)
+            </label>
+            <Field label="Renewal type">
+              <select className={inputCls} value={form.renewal_type} onChange={e => set('renewal_type', e.target.value)}>
+                {Object.entries(RENEWAL_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            </Field>
+            <Field label="Renewal term" hint="e.g. 12 months">{text('renewal_term')}</Field>
+            <Field label="Notice period (days)" required hint="Days before expiry that notice of non-renewal/termination is due. Reminders count down to this deadline, not the expiry.">
+              {text('notice_period_days', { type: 'number', min: 0, required: true })}
+            </Field>
+            <Field label="Termination for convenience?">
+              <select className={inputCls} value={form.termination_for_convenience} onChange={e => set('termination_for_convenience', e.target.value)}>
+                <option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option>
+              </select>
+            </Field>
+            {form.termination_for_convenience === 'true' && <Field label="Termination notice period (days)">{text('termination_notice_days', { type: 'number', min: 0 })}</Field>}
+            <Field label="Termination date" hint="What actually happened: when this contract was confirmed terminated or not renewed. Leave blank until that's decided.">{text('termination_date', { type: 'date' })}</Field>
+          </div>
+        </Card>
+
+        {showAdministration && (
+          <Card title="Administration" id="administration" icon={Settings2}>
             <div className="grid md:grid-cols-2 gap-4">
-              <Field label="Rationale: Why this software advances our mission" required hint="One paragraph." className="md:col-span-2">
-                <textarea className={inputCls} rows={4} required value={form.mission_justification} onChange={e => set('mission_justification', e.target.value)} />
-              </Field>
               <Field label="Administrator(s)" hint="Names or email addresses.">{text('administrators')}</Field>
               <Field label="More information / pricing">{text('pricing_info')}</Field>
               <Field label="Corporate (organization-wide) license?">
@@ -302,7 +268,7 @@ export default function ContractForm() {
         )}
 
         {kind === 'mou' && (
-          <Card title="MOU details" id="type-details">
+          <Card title="MOU details" id="type-details" icon={ListChecks}>
             <div className="grid md:grid-cols-2 gap-4">
               <Field label="Purpose" className="md:col-span-2"><textarea className={inputCls} rows={2} value={d.purpose || ''} onChange={e => setDetail('purpose', e.target.value)} /></Field>
               <Field label="Expected next step" hint="e.g. definitive agreement"><input className={inputCls} value={d.next_step || ''} onChange={e => setDetail('next_step', e.target.value)} /></Field>
@@ -312,7 +278,7 @@ export default function ContractForm() {
           </Card>
         )}
         {kind === 'sow' && (
-          <Card title="SOW details" id="type-details">
+          <Card title="SOW details" id="type-details" icon={ListChecks}>
             <div className="grid md:grid-cols-2 gap-4">
               <Field label="Project name"><input className={inputCls} value={d.project_name || ''} onChange={e => setDetail('project_name', e.target.value)} /></Field>
               <Field label="Deliverables summary" className="md:col-span-2"><textarea className={inputCls} rows={2} value={d.deliverables || ''} onChange={e => setDetail('deliverables', e.target.value)} /></Field>
@@ -320,28 +286,11 @@ export default function ContractForm() {
             </div>
           </Card>
         )}
-        {kind === 'vendor' && (
-          <Card title="Vendor details" id="type-details">
-            <div className="grid md:grid-cols-2 gap-4">
-              <Field label="Vendor contact"><input className={inputCls} value={d.vendor_contact || ''} onChange={e => setDetail('vendor_contact', e.target.value)} /></Field>
-            </div>
-          </Card>
-        )}
 
-        <Card title="Relationships and provisions" id="relationships">
-          <div className="grid md:grid-cols-2 gap-4 mb-4">
-            <Field label="This is an amendment to" hint="Links to the contract it amends."><select className={inputCls} value={form.amends_id} onChange={e => set('amends_id', e.target.value)}><option value="">Not an amendment</option>{contractOpts}</select></Field>
-            <Field label="Superseded by"><select className={inputCls} value={form.superseded_by_id} onChange={e => set('superseded_by_id', e.target.value)}><option value="">Not superseded</option>{contractOpts}</select></Field>
-            <Field label="Amended date">{text('amended_date', { type: 'date' })}</Field>
-            <Field label="Amendment description" className="md:col-span-2">{text('amendment_description')}</Field>
-          </div>
-          <p className="text-xs font-semibold text-gray-600 mb-2">Provisions present (optional)</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {PROVISIONS.map(([k, label]) => (
-              <label key={k} className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={!!form.provisions[k]} onChange={e => set('provisions', { ...form.provisions, [k]: e.target.checked })} /> {label}
-              </label>
-            ))}
+        <Card title="More" id="more" icon={MoreHorizontal}>
+          <div className="grid md:grid-cols-2 gap-4">
+            <Field label="Tags" hint="Comma-separated.">{text('tags')}</Field>
+            <Field label="Notes" className="md:col-span-2"><textarea className={inputCls} rows={3} value={form.notes} onChange={e => set('notes', e.target.value)} /></Field>
           </div>
         </Card>
 

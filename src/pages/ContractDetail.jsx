@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { Pencil } from 'lucide-react'
+import { Pencil, FileText, CalendarDays, DollarSign, Settings2, ListChecks } from 'lucide-react'
 import { getContract, getDirectory, listContracts } from '../lib/contracts'
-import { fmtDate, fmtDateTime, fmtMoney, RENEWAL_LABELS, SIGN_ON_LABELS, PROVISIONS, daysUntil } from '../lib/format'
-import { Page, Card, SectionNav, StatusBadge, ErrorMsg, Loading, ConfidentialNote, btnSecondary } from '../components/ui'
+import { fmtDate, fmtDateTime, fmtMoney, STATUS_LABELS, RENEWAL_LABELS, SIGN_ON_LABELS, PROVISIONS, daysUntil } from '../lib/format'
+import { Page, Card, SectionNav, StatusBadge, ErrorMsg, Loading, ConfidentialNote, KeyFacts, GroupHeading, btnSecondary } from '../components/ui'
 import { DocumentsPanel, DecisionPanel, MilestonesPanel, LinksPanel, AccessPanel, RelationshipsPanel, SignatoriesPanel, HistoryPanel } from '../components/contract/panels'
 import { useAuth, useCan } from '../context/AuthContext'
 
@@ -47,15 +47,24 @@ export default function ContractDetail() {
 
   const hasDecision = c.status === 'active' && !!c.notice_deadline
   const hasFinancial = c.annual_amount != null || c.annual_amount_note || c.value_amount != null || c.payment_terms || c.billing_frequency || c.budget_code
-  const hasTypeDetails = Object.values(d).some(Boolean)
+  // Vendor contact/email now live in Overview (moved off the Basics form in the visual refresh);
+  // excluded here so a vendor-kind contract with only those set doesn't show an empty type-details card.
+  const hasTypeDetails = Object.entries(d).some(([k, v]) => k !== 'vendor_contact' && k !== 'vendor_email' && Boolean(v))
   const hasSystemDetails = c.mission_justification || c.administrators || c.pricing_info || c.vendor_contact_note || c.corporate_license != null || c.sign_on_methods?.length > 0 || c.custom_msa
+
+  const keyFacts = [
+    { label: 'Status', value: STATUS_LABELS[c.status] || c.status },
+    { label: 'Vendor', value: c.counterparty?.name },
+    hasFinancial && { label: 'Annual amount', value: c.annual_amount != null ? fmtMoney(c.annual_amount, c.currency) : null },
+    c.status === 'active' && c.notice_deadline && { label: 'Notice deadline', value: fmtDate(c.notice_deadline), tone: days <= 60 ? 'warn' : undefined },
+  ].filter(Boolean)
   const navItems = [
     { id: 'decision', label: 'Renewal decision', show: hasDecision },
     { id: 'overview', label: 'Overview' },
     { id: 'dates', label: 'Dates & renewal' },
     { id: 'financial', label: 'Financial', show: hasFinancial },
     { id: 'type-details', label: c.type?.name?.split(' (')[0] || 'Type details', show: hasTypeDetails },
-    { id: 'system', label: 'System & subscription', show: hasSystemDetails },
+    { id: 'system', label: 'Administration', show: hasSystemDetails },
     { id: 'provisions', label: 'Provisions', show: provisions.length > 0 },
     { id: 'documents', label: 'Documents' },
     { id: 'milestones', label: 'Milestones', show: sectionVisible.milestones ?? true },
@@ -87,20 +96,24 @@ export default function ContractDetail() {
         )}
       </div>
 
+      <KeyFacts facts={keyFacts} />
+
       <div className="md:flex md:gap-8 md:items-start">
         <SectionNav items={navItems} orientation="left" title={c.title} />
         <div className="flex-1 min-w-0">
 
       <DecisionPanel contract={c} canEdit={canEdit} directory={directory} profileId={profile?.id} autoOpen={!!params.get('decide')} />
 
-      <Card title="Overview" id="overview">
+      <Card title="Overview" id="overview" icon={FileText}>
         <dl className="divide-y divide-gray-50">
           <Row label="System">{c.system_name}</Row>
           <Row label="Owner">{name(c.owner_id)}</Row>
+          <Row label="Department">{c.department}</Row>
+          <Row label="Vendor contact">{d.vendor_contact}</Row>
+          <Row label="Vendor email">{d.vendor_email}</Row>
           <Row label="Department manager">{c.department_manager}</Row>
           <Row label="Department manager email">{c.department_manager_email}</Row>
           <Row label="Backup owner">{name(c.backup_owner_id)}</Row>
-          <Row label="Department">{c.department}</Row>
           <Row label="Reminders">{c.reminders_enabled ? 'On' : 'Off'}</Row>
           <Row label="Original not on file">{c.no_original_exception && (
             <span className="text-amber-800">
@@ -114,17 +127,21 @@ export default function ContractDetail() {
         </dl>
       </Card>
 
-      <Card title="Dates & renewal" id="dates">
+      <Card title="Dates & renewal" id="dates" icon={CalendarDays}>
+        <GroupHeading>Term</GroupHeading>
         <dl className="divide-y divide-gray-50">
           <Row label="Initial contract date">{c.initial_contract_date && fmtDate(c.initial_contract_date)}</Row>
           <Row label="Current signatory">{c.signatory_name}</Row>
           <Row label="Signatory email">{c.signatory_email}</Row>
-          <Row label="Last renewed">{c.last_renewal_date && fmtDate(c.last_renewal_date)}</Row>
+          <Row label="Start date">{fmtDate(c.effective_date)}</Row>
           <Row label="Signed (current term)">{c.signed_date && fmtDate(c.signed_date)}</Row>
-          <Row label="Effective">{fmtDate(c.effective_date)}</Row>
+          <Row label="Last renewed">{c.last_renewal_date && fmtDate(c.last_renewal_date)}</Row>
           <Row label="Expires / next renewal">{c.evergreen ? 'Evergreen — no fixed end date' : fmtDate(c.expiration_date)}</Row>
           <Row label="Contract length">{c.contract_length_years != null && `${c.contract_length_years} year${c.contract_length_years == 1 ? '' : 's'}`}</Row>
           <Row label="Renewal">{RENEWAL_LABELS[c.renewal_type]}{c.renewal_term ? ` · ${c.renewal_term}` : ''}</Row>
+        </dl>
+        <GroupHeading>Notice &amp; termination</GroupHeading>
+        <dl className="divide-y divide-gray-50">
           <Row label="Notice period">{c.notice_period_days ? `${c.notice_period_days} days` : c.expiration_date ? 'None (deadline is the expiry)' : null}</Row>
           <Row label="Notice terms">{c.notice_terms}</Row>
           <Row label="Last day to cancel">{c.notice_deadline && <strong>{fmtDate(c.notice_deadline)}</strong>}</Row>
@@ -137,7 +154,7 @@ export default function ContractDetail() {
       </Card>
 
       {hasFinancial && (
-        <Card title="Financial" id="financial"><ConfidentialNote /><dl className="divide-y divide-gray-50">
+        <Card title="Financial" id="financial" icon={DollarSign}><ConfidentialNote /><dl className="divide-y divide-gray-50">
           <Row label="Annual amount">{c.annual_amount != null && `${fmtMoney(c.annual_amount, c.currency)} (≈ $${Math.round(c.annual_amount / 1000)}k)`}</Row>
           <Row label="Annual amount: notes">{c.annual_amount_note}</Row>
           <Row label="Total contract value">{c.value_amount != null && fmtMoney(c.value_amount, c.currency)}</Row>
@@ -146,14 +163,13 @@ export default function ContractDetail() {
       )}
 
       {hasTypeDetails && (
-        <Card title={`${c.type?.name?.split(' (')[0] || 'Type'} details`} id="type-details"><dl className="divide-y divide-gray-50">
+        <Card title={`${c.type?.name?.split(' (')[0] || 'Type'} details`} id="type-details" icon={ListChecks}><dl className="divide-y divide-gray-50">
           <Row label="Purpose">{d.purpose}</Row><Row label="Next step">{d.next_step}</Row><Row label="Target date">{d.target_date && fmtDate(d.target_date)}</Row>
           <Row label="Binding clauses">{d.binding_clauses}</Row><Row label="Project">{d.project_name}</Row><Row label="Deliverables">{d.deliverables}</Row>
-          <Row label="Vendor contact">{d.vendor_contact}</Row>
         </dl></Card>
       )}
       {hasSystemDetails && (
-        <Card title="System and subscription details" id="system"><dl className="divide-y divide-gray-50">
+        <Card title="Administration" id="system" icon={Settings2}><dl className="divide-y divide-gray-50">
           <Row label="Rationale"><span className="whitespace-pre-wrap">{c.mission_justification}</span></Row>
           <Row label="Administrator(s)">{c.administrators}</Row>
           <Row label="More information / pricing">{c.pricing_info}</Row>

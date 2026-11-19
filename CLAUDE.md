@@ -213,6 +213,51 @@ keep the positive-control checks, and for a new rule, break it on purpose once t
     `pages.mjs` `?decide=1` failure as before). **Migration 10 has not yet been run against the real
     Supabase project** — do that before merging this branch's app changes, per the usual migration-then-app
     ordering.
+- **Built (2026-11-19):** visual refresh of the contract detail/edit/create pages, from a design review
+  in a Claude Artifact canvas (not committed to this repo). `src/components/ui.jsx`'s `Card` gained an
+  optional `icon` prop (small rounded chip, used throughout `ContractDetail.jsx`, `ContractForm.jsx` and
+  `src/components/contract/panels.jsx`) and a new `KeyFacts` component (a stat-tile strip — status,
+  vendor, annual amount, notice deadline — shown above the section nav on the detail page); `GroupHeading`
+  groups related rows/fields inside one Card (e.g. "Term" vs "Notice & termination" under Dates & renewal).
+  On `ContractForm.jsx`, re-grouped into **Basics / Financial / Dates and renewal / Administration / More**
+  (Financial moved up to directly after Basics; "System and subscription" renamed **Administration**; Tags
+  and Notes moved into a new **More** section) and several relabels: "Effective date" → **Start date**
+  (also on the detail page's Dates & renewal card), "Signatory name/email" → **Signer / Signer email**,
+  "Termination notice (days)" → **Termination notice period (days)** with a hint distinguishing it from
+  the renewal notice period, Contract type now sits beside Vendor, Vendor contact (+ a new **Vendor
+  email**, stored in `details` jsonb like `vendor_contact` already was — no migration) moved from the
+  vendor-only "Vendor details" section into Basics so it applies to every contract kind, and Visibility's
+  Standard/Restricted select became a plain **Restricted** checkbox.
+  **Removed** (no longer settable through either form): Backup owner, Department manager + email, Contract
+  length (years), Initial contract date, the free-text "Renewal notice terms (as written)" field, the
+  per-contract reminders on/off toggle (reminders are now unconditionally on — `reminders_enabled: true`
+  is sent on every save, which re-enables reminders for any contract that had them off), and the whole
+  admin-only **Activation exception** section (`no_original_exception`/`no_original_reason` — admins can no
+  longer grant, change the reason for or revoke this via the UI at all; `contracts_guard()` in
+  `05_original_exception.sql` still enforces/honors it, so existing exceptions keep working, there's just no
+  UI path to one any more). All of these are *omitted* from the save payload rather than sent as `null`, so
+  an existing contract's current values for them survive being edited — they just can't be changed through
+  the app from here on. This was a deliberate, explicit call (confirmed with the user after flagging the
+  consequences) to carry the mockup's removals into the real app, not an oversight.
+  Two things the mockup asked for were **not** carried over, because the mockup never modeled contract
+  types other than "vendor" and the real form does: Internal owner and Restricted stayed in Basics instead
+  of moving into Administration, because Administration only renders for `kind === 'vendor' || 'other'` —
+  moving them there would have made Internal owner (required for every contract) and Restricted (a
+  universal access-control field) impossible to set at all for MOU/SOW contracts. Also keeping
+  `sensitivity` defaulting to `'standard'` rather than flipping the New-contract default to `'restricted'`
+  (a later mockup comment asked for the latter) — defaulting every new contract org-wide to restricted
+  visibility is a real access-control posture change, not a layout tweak, so it needs a deliberate decision
+  rather than inheriting it from a UI-review comment thread. `evergreen` stayed a separate real checkbox
+  (just repositioned next to Renewal type) rather than being folded into the `renewal_type` enum, since
+  `contracts_guard()` and the notification-requirements logic both read the real `evergreen` column
+  directly and `renewal_type` is purely descriptive — merging them would have been a schema change, not a
+  restyle.
+  `tests/ui/sheet_fields.mjs` updated to match (relabeled locators, new assertions that the removed fields
+  are genuinely absent from both the Playwright DOM and the save payload, and that `reminders_enabled` is
+  always `true`). Verified this session: `npm run build` succeeds, and `tests/ui/{pages,sheet_fields,users}.mjs`
+  all pass against a local Vite dev server (same one pre-existing, unrelated `pages.mjs` `?decide=1` failure
+  noted in earlier entries above). No `supabase/contracts/` migration was needed — nothing here touched the
+  schema.
 - **Open decision:** whether the sheet's "Other Systems" tab (many rows with no contract) is imported, and as
   what — on hold (2026-10-08), revisit later.
 - **Planned, not built:** import of the existing tracking sheet (it is confidential — don't commit it);
