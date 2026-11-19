@@ -100,11 +100,11 @@ export default function AdminSettings() {
           </Card>
           <Card title="Notification requirements">
             <form onSubmit={saveNotif} className="grid md:grid-cols-2 gap-4">
-              <Field label="Termination notice lead times (days before the computed notice deadline)" hint="To the signatory and department manager, separately from the reminder above. Comma-separated, e.g. 90, 30.">
+              <Field label="Termination notice lead times (days before the computed notice deadline)" hint="To the SIL signer and the contract owner, separately from the reminder above. Comma-separated, e.g. 90, 30.">
                 <input className={inputCls} value={notif.termLeads} onChange={e => setNotif(f => ({ ...f, termLeads: e.target.value }))} /></Field>
               <Field label="Contract-end lead times (days before the contract end date)" hint="Comma-separated, e.g. 90, 30.">
                 <input className={inputCls} value={notif.endLeads} onChange={e => setNotif(f => ({ ...f, endLeads: e.target.value }))} /></Field>
-              <Field label="Missing-data reminder: first nudge + repeat (days after the record was added)" hint="To the signatory and department manager, while any required field is still blank.">
+              <Field label="Missing-data reminder: first nudge + repeat (days after the record was added)" hint="To the SIL signer and the contract owner, while any required field is still blank.">
                 <input type="number" min="0" className={inputCls} value={notif.mduDays} onChange={e => setNotif(f => ({ ...f, mduDays: e.target.value }))} /></Field>
               <Field label="Missing-data escalation: first nudge + repeat (days after the record was added)">
                 <input type="number" min="0" className={inputCls} value={notif.mdeDays} onChange={e => setNotif(f => ({ ...f, mdeDays: e.target.value }))} /></Field>

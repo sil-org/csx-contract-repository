@@ -31,7 +31,7 @@ begin
     id, title, type_id, counterparty_id, owner_id, department, created_at,
     effective_date, signed_date, expiration_date, notice_period_days, termination_date, reminders_enabled,
     system_name, annual_amount, mission_justification, signatory_name, signatory_email,
-    department_manager, department_manager_email, contract_length_years
+    counterparty_signer_name, counterparty_signed_date, contract_length_years
   ) values (
     p_id, 'Contract ' || left(p_id::text, 4), v_type, '00000000-0000-0000-0000-00000000f0c1',
     '00000000-0000-0000-0000-00000000f0a1', 'Ops', p_created_at,
@@ -43,8 +43,8 @@ begin
     case when p_complete then 'Mission reasons' end,
     case when p_complete then 'Jo Signer' end,
     case when p_complete then 'jo@acme.example' end,
-    case when p_complete then 'Pat Manager' end,
-    case when p_complete then 'pat@sil.org' end,
+    case when p_complete then 'Vee Vendor' end,
+    case when p_complete then date '2024-12-16' end,
     case when p_complete then 2.0 end
   );
   if p_status = 'active' then
@@ -68,21 +68,21 @@ select t_eq('91 days before end date: nothing yet', t_has(:'c1', date '2026-06-0
 select t_eq('90 days before end date: contract_end_notice_90', t_has(:'c1', date '2026-06-03', 'contract_end_notice_90'), true);
 select t_eq('30 days before end date: contract_end_notice_30', t_has(:'c1', date '2026-08-02', 'contract_end_notice_30'), true);
 
--- recipients: signatory + department manager (contract is complete, so both are set)
-select t_eq('termination notice goes to signatory + department manager',
+-- recipients: signatory + owner (the owner is no longer optional; department manager is gone)
+select t_eq('termination notice goes to signatory + owner',
   (select to_emails from contract_reminders_due(date '2026-04-04') where contract_id = :'c1' and kind = 'termination_notice_90'),
-  array['jo@acme.example', 'pat@sil.org']);
+  array['jo@acme.example', 'owner@sil.org']);
 
 -- a recorded decision for the cycle suppresses the new notices too, same as the original ones
 insert into contract_decisions (contract_id, notice_deadline, decision, rationale)
 values (:'c1', date '2026-07-03', 'renew', 'Keep it');
 select t_eq('decision suppresses termination_notice too', t_has(:'c1', date '2026-06-03', 'termination_notice_30'), false);
 
--- recipients fall back to the owner when signatory/dept-manager emails are both blank
+-- with no signatory email the owner is still notified (never nobody)
 \set c1b '00000000-0000-0000-0000-00000000f0d2'
 select t_contract(:'c1b', 'active', now(), date '2026-09-01');
-update contracts set signatory_email = null, department_manager_email = null where id = :'c1b';
-select t_eq('falls back to owner when signatory/dept-manager emails are blank',
+update contracts set signatory_email = null where id = :'c1b';
+select t_eq('owner alone is notified when the signatory email is blank',
   (select to_emails from contract_reminders_due(date '2026-04-04') where contract_id = :'c1b' and kind = 'termination_notice_90'),
   array['owner@sil.org']);
 
@@ -96,7 +96,7 @@ select t_eq('15 days after add date: not due again yet', t_has(:'c2', date '2026
 select t_eq('28 days after add date: fires again (biweekly)', t_has(:'c2', date '2026-01-29', 'missing_data_update'), true);
 
 select t_eq('missing_fields lists what is actually missing', (
-  select missing_fields @> array['System / product', 'Signatory name'] from contract_reminders_due(date '2026-01-15')
+  select missing_fields @> array['System / product', 'SIL signer', 'Other party signer'] from contract_reminders_due(date '2026-01-15')
   where contract_id = :'c2' and kind = 'missing_data_update'), true);
 
 -- escalation to named individuals: no rows until the settings are configured (empty by default)
@@ -111,8 +111,8 @@ update contract_settings set value = '[]' where key = 'missing_data_escalation_e
 
 -- filling in the missing fields stops both reminders on the next cycle
 update contracts set system_name = 'Zoom', annual_amount = 1000, mission_justification = 'x',
-  signatory_name = 'Jo Signer', signatory_email = 'jo@acme.example', department_manager = 'Pat Manager',
-  department_manager_email = 'pat@sil.org', contract_length_years = 2.0,
+  signatory_name = 'Jo Signer', signatory_email = 'jo@acme.example', counterparty_signer_name = 'Vee Vendor',
+  counterparty_signed_date = date '2024-12-16', contract_length_years = 2.0,
   effective_date = date '2025-01-01', signed_date = date '2024-12-15', expiration_date = date '2030-01-01'
   where id = :'c2';
 select t_eq('no longer missing once the record is completed', contract_missing_attrs(contracts), '{}'::text[]) from contracts where id = :'c2';

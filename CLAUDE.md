@@ -204,7 +204,7 @@ keep the positive-control checks, and for a new rule, break it on purpose once t
     `parent_id` guard edit). Updated every reference to the old name (`supabase/seed/test_contracts.sql`,
     `supabase/tests/20_security_test.sql`, `tests/ui/pages.mjs`, `run.sh`'s migration list).
   - The Edit contract form's section nav is now the same sticky left sidebar as the contract detail
-    page (`SectionNav orientation="left"` in `src/pages/ContractForm.jsx`), instead of only the
+    page (`SectionNav orientation="left"` in `src/pages/ContractForm.jsx` (since replaced by `ContractPage.jsx`, below)), instead of only the
     horizontal bar at the top.
   - Verified the same way as 08/09 above (disposable `postgres:16-alpine` container, Docker wasn't
     running so it was started first): migrations 01→10 run clean twice in a row, the full SQL suite
@@ -213,6 +213,42 @@ keep the positive-control checks, and for a new rule, break it on purpose once t
     `pages.mjs` `?decide=1` failure as before). **Migration 10 has not yet been run against the real
     Supabase project** — do that before merging this branch's app changes, per the usual migration-then-app
     ordering.
+- **Built (2026-11-19):** one page for viewing, creating and editing a contract —
+  `src/pages/ContractPage.jsx` replaces `ContractDetail.jsx` and `ContractForm.jsx` (same routes:
+  `/contracts/:id` = view, `/contracts/:id/edit` and `/contracts/new` = edit; `edit` prop). Same layout in
+  every mode; view shows each field as text, edit swaps in the input (`fld()` helper). Edit button only
+  for admins and the contract's owner/backup; Save/Cancel only in edit mode. No migration needed.
+  - Top **Essentials** card is the quick-add: title/type/vendor/owner/department, annual amount + total
+    value, signatory + department manager (name + email), initial contract date, effective/signed/expiration
+    dates, contract length + notice period (shows the computed last day to give notice), **Rationale**, and the **signed original** (PDF
+    picker; uploaded right after the contract saves, as a new version if one already exists; if the upload
+    fails the contract is still saved and the edit page shows why).
+  - Everything else is "add later" cards below: Ownership & visibility (backup owner, visibility, tags,
+    reminders, admin original exception), Financial details, System & subscription, Renewal & termination
+    type details, Related & provisions — then the
+    existing self-saving panels (documents, milestones, links, signatory history, history).
+  - Required-on-create is now just the Essentials (client-side only). Newly required: department manager
+    name/email. Signatory is still editable
+    only on create. UI tests updated (`tests/ui/sheet_fields.mjs`, `pages.mjs`); same one pre-existing
+    `?decide=1` failure in `pages.mjs`.
+- **Built (2026-11-19, later):** simplified signers, no department — `11_simplified_signers.sql`
+  (**not yet run against the real Supabase project; run it before merging the app change**, since new
+  contracts are now saved without a department and the old column was `not null`):
+  - Department and department manager are no longer collected or shown (also gone from the contracts
+    list filter/search). `department` stays as a nullable column; `department_manager[_email]` stay but
+    are unused. Nothing was dropped.
+  - Signers section = the party ("Vendor" for vendor contracts, "Other party" for MOUs/SOWs/other), SIL
+    signer + email + **SIL signed on** (the existing `signatory_*` / `signed_date`) and the other party's
+    signer + **signed on** (new `counterparty_signer_name`, `counterparty_signed_date`). Going Active is
+    unchanged: still needs effective date + SIL signed date (+ original, + MSA copy if custom MSA).
+  - Reminders that went to "signatory + department manager" (termination notice, contract end,
+    termination-date update) now go to signatory + owner. Missing-data check dropped department manager
+    and added other-party signer/date.
+  - SQL tests: new `80_simplified_signers_test.sql`; `60_`/`70_` updated for the new labels/recipients.
+    `10_reminders_test.sql` had a latent date dependency (missing-data reminders recur from `created_at`,
+    which was "now", so the expectations changed with the day the suite ran) — pinned `created_at`.
+    Run locally without the license-manager kernel via a throwaway stand-in (profiles, linked_accounts,
+    current_profile_id) — the real kernel file wasn't available.
 - **Open decision:** whether the sheet's "Other Systems" tab (many rows with no contract) is imported, and as
   what — on hold (2026-10-08), revisit later.
 - **Planned, not built:** import of the existing tracking sheet (it is confidential — don't commit it);
