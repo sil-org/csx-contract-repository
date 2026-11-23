@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Upload, Trash2, ExternalLink } from 'lucide-react'
+import { Upload, Trash2, ExternalLink, FileText, CalendarCheck, ListTodo, Link2, Lock, Users, GitBranch, History } from 'lucide-react'
 import { Card, Field, ErrorMsg, btnPrimary, btnSecondary, inputCls } from '../ui'
 import { fmtDate, fmtDateTime, fmtBytes, daysUntil, DOC_ROLE_LABELS, DECISION_LABELS } from '../../lib/format'
 import {
@@ -45,7 +45,7 @@ export function DocumentsPanel({ contract, canEdit, directory, onChange }) {
   async function open(id) { try { await openDocument(id) } catch (x) { setErr(x) } }
 
   return (
-    <Card title="Documents" id="documents">
+    <Card title="Documents" id="documents" icon={FileText}>
       <ErrorMsg error={error || err} />
       {!hasOriginal && docs && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-3 py-2 mb-3">
@@ -132,7 +132,7 @@ export function DecisionPanel({ contract, canEdit, directory, profileId, autoOpe
   }
 
   return (
-    <Card title="Renewal decision" id="decision">
+    <Card title="Renewal decision" id="decision" icon={CalendarCheck}>
       <ErrorMsg error={error || err} />
       <p className="text-sm text-gray-600 mb-3">
         Notice deadline <strong>{fmtDate(contract.notice_deadline)}</strong>{' '}
@@ -167,7 +167,7 @@ export function MilestonesPanel({ contract, canEdit, onVisible }) {
   useEffect(() => { onVisible?.(visible) }, [visible]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!visible) return null
   return (
-    <Card title="Milestones and dated obligations" id="milestones">
+    <Card title="Milestones and dated obligations" id="milestones" icon={ListTodo}>
       <ErrorMsg error={error || err} />
       <ul className="divide-y divide-gray-100 mb-2">
         {items?.map(m => (
@@ -200,7 +200,7 @@ export function LinksPanel({ contract, canEdit, profileId, onVisible }) {
   useEffect(() => { onVisible?.(visible) }, [visible]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!visible) return null
   return (
-    <Card title="Working-copy links" id="links">
+    <Card title="Working-copy links" id="links" icon={Link2}>
       <ErrorMsg error={error || err} />
       <p className="text-xs text-gray-500 mb-2">Convenience links (e.g. Google Drive). They can break if someone moves or deletes the file — the stored original above is the authoritative copy.</p>
       <ul className="divide-y divide-gray-100 mb-2">
@@ -235,7 +235,7 @@ export function AccessPanel({ contract, canEdit, directory, profileId }) {
   if (contract.sensitivity !== 'restricted') return null
   const act = fn => async () => { setErr(null); try { await fn(); reload() } catch (x) { setErr(x) } }
   return (
-    <Card title="Who can see this restricted contract" id="access">
+    <Card title="Who can see this restricted contract" id="access" icon={Lock}>
       <ErrorMsg error={error || err} />
       <p className="text-xs text-gray-500 mb-2">Always: the owner, backup owner, admins and auditors. Plus the people named here.</p>
       <ul className="mb-2 text-sm">
@@ -273,7 +273,7 @@ export function SignatoriesPanel({ contract, canEdit, profileId, onVisible }) {
   const currentId = items?.filter(s => s.start_date <= today).sort((a, b) => b.start_date.localeCompare(a.start_date) || b.created_at.localeCompare(a.created_at))[0]?.id
 
   return (
-    <Card title="Signatory history" id="signatories">
+    <Card title="Signatory history" id="signatories" icon={Users}>
       <ErrorMsg error={error || err} />
       <p className="text-xs text-gray-500 mb-2">Who's responsible for signing can change over a long-running contract. The most recent entry on or before today is the current signatory shown elsewhere on this record.</p>
       <ul className="divide-y divide-gray-100 mb-2">
@@ -322,7 +322,7 @@ export function RelationshipsPanel({ contract, allContracts, onVisible }) {
   if (!visible) return null
   const L = c => <Link className="text-brand hover:underline" to={`/contracts/${c.id}`}>{c.title}</Link>
   return (
-    <Card title="Related contracts" id="relationships">
+    <Card title="Related contracts" id="relationships" icon={GitBranch}>
       <ul className="text-sm space-y-1">
         {amends && <li>Amends: {L(amends)}</li>}
         {supers && <li>Superseded by: {L(supers)}</li>}
@@ -336,7 +336,7 @@ export function RelationshipsPanel({ contract, allContracts, onVisible }) {
 export function HistoryPanel({ contract, directory }) {
   const [{ data: rows, error }] = useLoad(() => listAudit({ contractId: contract.id, limit: 100 }), [contract.id])
   return (
-    <Card title="History" id="history">
+    <Card title="History" id="history" icon={History}>
       <ErrorMsg error={error} />
       <ul className="divide-y divide-gray-100 text-xs">
         {rows?.map(r => (

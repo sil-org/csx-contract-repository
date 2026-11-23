@@ -325,6 +325,40 @@ keep the positive-control checks, and for a new rule, break it on purpose once t
   `VITE_SSO_PROVIDER_ID`. Verified: `npm run build` succeeds, `tests/ui/{pages,sheet_fields,users}.mjs` all
   pass (same pre-existing `?decide=1` failure, unrelated) — none of them exercise the sign-in button itself,
   since they all mock an already-authenticated session.
+- **Built (2026-11-23):** reconciled the visual-refresh branch (above) against `main`'s unification of
+  `ContractDetail.jsx`/`ContractForm.jsx` into `src/pages/ContractPage.jsx` (PR #14, merged while the
+  visual-refresh branch was still open as PR #15) — the two branches had independently redesigned the same
+  pages. Rebuilt on a fresh branch off current `main`, cherry-picking the SAML SSO commit (clean — it never
+  touched these files) and manually re-applying only the parts of the visual refresh that don't conflict
+  with choices `main` already made:
+  - Carried over: the `Card` icon-prop / `KeyFacts` stat-tile strip in `ui.jsx` (re-added; `main` never
+    touched this file) — `ContractPage.jsx` has its own local `Section`/`Group` components, not `ui.jsx`'s
+    `Card`, so `Section` got the same icon-prop treatment directly, plus a `KeyFacts` strip in its header;
+    `panels.jsx` got its icon chips back too. "Effective date" → **Start date**. The free-text "Renewal
+    notice terms (as written)" field removed (your "trash it" call from the design review — `main`'s
+    redesign never addressed this field either way, so no conflict). "Termination notice (days)" →
+    **Termination notice period (days)** with the same clarifying hint. The expiration-before-start-date
+    guard (`min` on the date picker + a friendly pre-save error, from the separate `contracts_check`
+    constraint fix) reapplied directly in `ContractPage.jsx`'s `submit()`. `notice_period_days` now
+    defaults to 30 for a new contract. Added **Vendor email** next to the existing Vendor contact field in
+    the vendor-kind "Vendor details" add-later section (stored in `details` jsonb like `vendor_contact`,
+    no migration) — kept in that add-later section rather than moved up to Essentials, since `main`'s
+    Essentials is a deliberately lean quick-add.
+  - **Not** carried over, because `main` explicitly decided differently: Backup owner, the reminders
+    on/off toggle, and the admin original-exception section all stayed (`main` kept them, reorganized
+    under "Ownership & visibility", rather than removing them). Visibility stayed a Standard/Restricted
+    select, not a checkbox. The section stayed named "System & subscription", not renamed "Administration".
+    Initial contract date and Contract length stayed required in Essentials (`main` went the opposite
+    direction from the visual-refresh branch on purpose). Department manager removal was already done by
+    `main`'s own `11_simplified_signers.sql` migration — nothing left to do there. Contract type was left
+    where `main` put it (grouped with Status in "The contract", not moved next to Vendor), since `main`
+    groups Essentials by concept (Vendor lives with the other Signers fields) rather than by field
+    adjacency, and moving it would have fought that grouping.
+  `tests/ui/sheet_fields.mjs` updated for the relabel and the removed field (including a genuine
+  absence check, not just a coincidental text match — the old detail-page "notice terms as written" check
+  happened to pass against the unrelated Notice-period-days value, "60 days" either way, so it wasn't
+  actually testing what it claimed to). Verified: `npm run build` succeeds, `tests/ui/{pages,sheet_fields,
+  users}.mjs` all pass (same pre-existing, unrelated `?decide=1` failure as every entry above).
 - **Open decision:** whether the sheet's "Other Systems" tab (many rows with no contract) is imported, and as
   what — on hold (2026-10-08), revisit later.
 - **Planned, not built:** import of the existing tracking sheet (it is confidential — don't commit it);

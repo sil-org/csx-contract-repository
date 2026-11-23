@@ -19,17 +19,43 @@ export function Page({ title, actions, children, wide, tabs }) {
   )
 }
 
-export function Card({ title, children, actions, id }) {
+// `icon`: a lucide-react component rendered in a small rounded chip before the title,
+// matching the contract pages' visual language. Omit it for a plain heading (unchanged look).
+export function Card({ title, children, actions, id, icon: Icon, meta }) {
   return (
     <section id={id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-5 scroll-mt-4">
       {(title || actions) && (
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2.5 mb-3">
+          {Icon && (
+            <span className="w-7 h-7 rounded-lg bg-brand/[0.09] text-brand flex items-center justify-center flex-shrink-0">
+              <Icon size={15} />
+            </span>
+          )}
           <h2 className="font-semibold text-gray-800">{title}</h2>
-          <div className="flex gap-2">{actions}</div>
+          {meta && <span className="text-xs text-gray-400 ml-1">{meta}</span>}
+          <div className="flex gap-2 ml-auto">{actions}</div>
         </div>
       )}
       {children}
     </section>
+  )
+}
+
+// A row of small stat tiles for an at-a-glance summary above a long record (e.g. status,
+// counterparty, amount, next deadline). `facts`: [{ label, value, tone? }], tone 'warn' tints
+// the value amber. Renders nothing for fewer than 2 facts.
+export function KeyFacts({ facts }) {
+  const visible = (facts || []).filter(f => f && f.value != null && f.value !== '')
+  if (visible.length < 2) return null
+  return (
+    <div className="grid gap-px bg-gray-100 border border-gray-100 rounded-xl overflow-hidden mb-5" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(10rem, 1fr))` }}>
+      {visible.map((f, i) => (
+        <div key={i} className="bg-white px-4 py-3">
+          <div className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-0.5">{f.label}</div>
+          <div className={`text-sm font-bold ${f.tone === 'warn' ? 'text-amber-700' : 'text-gray-900'}`}>{f.value}</div>
+        </div>
+      ))}
+    </div>
   )
 }
 
