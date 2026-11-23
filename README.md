@@ -12,7 +12,7 @@ Built on [`sil-app-template`](https://github.com/kode-monki/sil-app-template) an
 | Layer | Choice |
 |---|---|
 | Frontend | React + Vite + Tailwind → AWS Amplify Hosting (builds on push to `main`) |
-| Sign-in | Google (SIL staff) via the shared Supabase Auth, same as license-manager |
+| Sign-in | SAML SSO (SIL staff) via the shared Supabase Auth — same provider as license-manager, which still offers Google alongside it for now |
 | Data + rules | Supabase Postgres. All access control is row-level security; roles live in `contract_roles`, **separate from license-manager's roles** |
 | Documents | Private **S3** bucket with versioning + Object Lock; the browser uploads/downloads with short-lived signed URLs from the `contract-documents` Edge Function. Postgres stores the index, SHA-256 and S3 version of each file |
 | Reminders | Daily `pg_cron` → `contract-reminders` Edge Function → license-manager's `send-email`; what is due is computed in a tested SQL function |

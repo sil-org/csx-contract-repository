@@ -44,10 +44,11 @@ await t.page.getByText('Initial contract').first().waitFor({ timeout: 8000 })
 const body = await t.page.locator('main').innerText()
 for (const [label, needle] of [
   ['system', 'Freshworks CRM (Customer Relationship Management)'], ['initial contract date', 'Nov 6, 2020'], ['current signatory', 'Sheryl Howe'],
-  ['last renewal date', 'Nov 10, 2025'], ['next renewal date (label)', 'Expiration / next renewal date'], ['notice terms as written', '60 days'], ['last day to cancel', 'Sep 11, 2026'],
+  ['last renewal date', 'Nov 10, 2025'], ['next renewal date (label)', 'Expiration / next renewal date'], ['last day to cancel', 'Sep 11, 2026'],
   ['annual amount + thousands', '$35,000.00 (≈ $35k)'], ['annual amount notes', 'quoted as $35k'], ['mission paragraph', 'our donors are critical to our mission'],
   ['administrators', 'crm-admin@sil.org'], ['pricing info', 'See most recent pricing'], ['corporate license yes', 'Corporate (organization-wide) license?'], ['vendor contact rule', 'Do not contact the vendor without speaking to the department manager'],
   ['confidentiality notice', 'not to be shared with vendors or outside SIL'], ['drive link in notes', 'drive.google.com/open?id=17jQN']]) check('detail shows ' + label, body.includes(needle))
+check('the removed "Renewal notice terms (as written)" field is not shown on the detail page', !body.includes('Renewal notice terms'))
 check('detail has the Essentials quick-add card and an Edit button (and no Save)', await t.page.getByRole('heading', { name: 'Essentials' }).isVisible()
   && await t.page.getByRole('link', { name: 'Edit' }).count() === 1 && await t.page.getByRole('button', { name: 'Save changes' }).count() === 0)
 check('detail flags the missing signed original', body.includes('Not uploaded yet'))
@@ -63,6 +64,7 @@ check('form loads signatory name', await val('Current SIL signer') === 'Sheryl H
 check('form loads corporate license = Yes and Google sign-on checked', await val('Corporate (organization-wide) license?') === 'true'
   && await t.page.locator('label', { hasText: 'Google' }).locator('input[type=checkbox]').isChecked())
 check('form loads mission paragraph', (await val('Rationale: Why this software advances our mission')).includes('donors'))
+check('the removed "Renewal notice terms (as written)" field has no form control', await t.page.locator('label', { hasText: 'Renewal notice terms' }).count() === 0)
 await t.page.locator('label', { hasText: 'signer' }).filter({ hasNotText: 'SIL' }).locator('input').fill('Vee Vendor')
 await t.page.locator('label', { hasText: 'Vendor signed on' }).locator('input').fill('2025-11-12')
 await t.page.locator('label', { hasText: 'Annual amount: notes' }).locator('input').fill('  quoted as $35k + 2% fees  ')
@@ -96,7 +98,7 @@ await t.page.locator('label', { hasText: 'Initial contract date' }).locator('inp
 await t.page.locator('label', { hasText: 'SIL signer' }).first().locator('input').fill('Jo Signer')
 await t.page.locator('label', { hasText: 'SIL signer email' }).locator('input').fill('jo@zoom.example')
 await t.page.locator('label', { hasText: 'SIL signed on' }).locator('input').fill('2026-01-01')
-await t.page.locator('label', { hasText: 'Effective date' }).locator('input').fill('2026-01-01')
+await t.page.locator('label', { hasText: 'Start date' }).locator('input').fill('2026-01-01')
 await t.page.locator('label', { hasText: 'Expiration / next renewal date' }).locator('input').fill('2027-01-01')
 await t.page.locator('label', { hasText: 'Contract length (years)' }).locator('input').fill('1')
 await t.page.locator('label', { hasText: 'Annual amount' }).first().locator('input').fill('1000')

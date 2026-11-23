@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
-// Supabase redirects here after Google OAuth. The SDK handles the token
+// Supabase redirects here after the SSO (SAML) sign-in. The SDK handles the token
 // exchange automatically; we just wait for the session and redirect.
 export default function AuthCallback() {
   const navigate = useNavigate()

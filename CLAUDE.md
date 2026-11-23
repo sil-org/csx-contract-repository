@@ -6,8 +6,10 @@ tool (no drafting, routing or signing). Requirements: `docs/REQUIREMENTS.md`. Se
 
 ## Architecture (decisions already made — don't relitigate without asking)
 - **Frontend:** React + Vite + Tailwind from `sil-app-template`, hosted on **AWS Amplify** (builds on push to `main`).
-- **Backend:** the **same Supabase project as `license-manager`** — same Google sign-in, same `profiles` /
-  `linked_accounts`. Because it is shared:
+- **Backend:** the **same Supabase project as `license-manager`** — same `profiles` / `linked_accounts`. Sign-in
+  is SAML SSO (`VITE_SSO_PROVIDER_ID`), the same provider registered project-wide (shared with license-manager
+  and helpdesk); this app is SSO-only — no Google button here (license-manager still offers Google alongside SSO
+  for its own existing users; don't assume this app follows that pattern). Because the project is shared:
   - Everything here is `contract_`-prefixed (or plainly contract-specific). **Never alter license-manager tables,
     types or functions**, and never touch the shared `user_role` enum.
   - **Contract roles are separate** (`contract_roles`: viewer / contributor / auditor / admin). A license-manager
@@ -33,7 +35,7 @@ tool (no drafting, routing or signing). Requirements: `docs/REQUIREMENTS.md`. Se
 
 ## Commands
 ```bash
-npm install && cp .env.example .env   # same VITE_SUPABASE_URL / ANON_KEY as license-manager
+npm install && cp .env.example .env   # same VITE_SUPABASE_URL / ANON_KEY / SSO_PROVIDER_ID as license-manager
 npm run dev                           # http://localhost:5173
 npm run build
 
@@ -249,6 +251,114 @@ keep the positive-control checks, and for a new rule, break it on purpose once t
     which was "now", so the expectations changed with the day the suite ran) — pinned `created_at`.
     Run locally without the license-manager kernel via a throwaway stand-in (profiles, linked_accounts,
     current_profile_id) — the real kernel file wasn't available.
+- **Built (2026-11-19, on a different branch — reconciled 2026-11-23, see that entry below):** visual
+  refresh of the contract detail/edit/create pages, from a design review
+  in a Claude Artifact canvas (not committed to this repo). `src/components/ui.jsx`'s `Card` gained an
+  optional `icon` prop (small rounded chip, used throughout `ContractDetail.jsx`, `ContractForm.jsx` and
+  `src/components/contract/panels.jsx`) and a new `KeyFacts` component (a stat-tile strip — status,
+  vendor, annual amount, notice deadline — shown above the section nav on the detail page); `GroupHeading`
+  groups related rows/fields inside one Card (e.g. "Term" vs "Notice & termination" under Dates & renewal).
+  On `ContractForm.jsx`, re-grouped into **Basics / Financial / Dates and renewal / Administration / More**
+  (Financial moved up to directly after Basics; "System and subscription" renamed **Administration**; Tags
+  and Notes moved into a new **More** section) and several relabels: "Effective date" → **Start date**
+  (also on the detail page's Dates & renewal card), "Signatory name/email" → **Signer / Signer email**,
+  "Termination notice (days)" → **Termination notice period (days)** with a hint distinguishing it from
+  the renewal notice period, Contract type now sits beside Vendor, Vendor contact (+ a new **Vendor
+  email**, stored in `details` jsonb like `vendor_contact` already was — no migration) moved from the
+  vendor-only "Vendor details" section into Basics so it applies to every contract kind, and Visibility's
+  Standard/Restricted select became a plain **Restricted** checkbox.
+  **Removed** (no longer settable through either form): Backup owner, Department manager + email, Contract
+  length (years), Initial contract date, the free-text "Renewal notice terms (as written)" field, the
+  per-contract reminders on/off toggle (reminders are now unconditionally on — `reminders_enabled: true`
+  is sent on every save, which re-enables reminders for any contract that had them off), and the whole
+  admin-only **Activation exception** section (`no_original_exception`/`no_original_reason` — admins can no
+  longer grant, change the reason for or revoke this via the UI at all; `contracts_guard()` in
+  `05_original_exception.sql` still enforces/honors it, so existing exceptions keep working, there's just no
+  UI path to one any more). All of these are *omitted* from the save payload rather than sent as `null`, so
+  an existing contract's current values for them survive being edited — they just can't be changed through
+  the app from here on. This was a deliberate, explicit call (confirmed with the user after flagging the
+  consequences) to carry the mockup's removals into the real app, not an oversight.
+  Two things the mockup asked for were **not** carried over, because the mockup never modeled contract
+  types other than "vendor" and the real form does: Internal owner and Restricted stayed in Basics instead
+  of moving into Administration, because Administration only renders for `kind === 'vendor' || 'other'` —
+  moving them there would have made Internal owner (required for every contract) and Restricted (a
+  universal access-control field) impossible to set at all for MOU/SOW contracts. Also keeping
+  `sensitivity` defaulting to `'standard'` rather than flipping the New-contract default to `'restricted'`
+  (a later mockup comment asked for the latter) — defaulting every new contract org-wide to restricted
+  visibility is a real access-control posture change, not a layout tweak, so it needs a deliberate decision
+  rather than inheriting it from a UI-review comment thread. `evergreen` stayed a separate real checkbox
+  (just repositioned next to Renewal type) rather than being folded into the `renewal_type` enum, since
+  `contracts_guard()` and the notification-requirements logic both read the real `evergreen` column
+  directly and `renewal_type` is purely descriptive — merging them would have been a schema change, not a
+  restyle.
+  `tests/ui/sheet_fields.mjs` updated to match (relabeled locators, new assertions that the removed fields
+  are genuinely absent from both the Playwright DOM and the save payload, and that `reminders_enabled` is
+  always `true`). Verified this session: `npm run build` succeeds, and `tests/ui/{pages,sheet_fields,users}.mjs`
+  all pass against a local Vite dev server (same one pre-existing, unrelated `pages.mjs` `?decide=1` failure
+  noted in earlier entries above). No `supabase/contracts/` migration was needed — nothing here touched the
+  schema.
+- **Built (2026-11-23):** switched sign-in from Google OAuth to SAML SSO (`supabase.auth.signInWithSSO`),
+  **this app only** — license-manager (and helpdesk) are a separate move, deliberately done one at a time so
+  each can be tested on its own; license-manager is keeping Google alongside SSO for its own existing users,
+  contract-repository is SSO-only. The SAML IdP itself was already registered on the shared Supabase project
+  (coordinated with the license-manager session, not done here) — nothing to register for this app.
+  `src/lib/auth.js`'s `signInWithGoogle()` → `signInWithSSO()`, reading the provider UUID from the new
+  `VITE_SSO_PROVIDER_ID` env var (same name/value as license-manager's, for consistency — not shared at
+  runtime, just convention); `src/pages/Home.jsx`'s Google button replaced with a generic SSO button (no
+  provider-branded icon, since this account's identity isn't tied to Google any more); `AuthCallback.jsx`'s
+  comment updated (behavior unchanged — it's provider-agnostic, just waits for a session). `resolveProfile()`
+  and `AuthContext.jsx` needed no changes; they were already provider-agnostic.
+  Checked the shared `resolve_profile()` RPC (in license-manager's `supabase/schema.sql`, which this repo's
+  SQL tests and this live project both depend on but never edits) before touching anything: it already derives
+  identity only from `auth.uid()`/`auth.users` and ignores the legacy `p_supabase_user_id`/`p_email`
+  parameters — a client-supplied-identity hole that's documented there as already fixed. No `auth.users`
+  provisioning trigger exists either; profile creation is solely through that RPC. Neither needed any action
+  here.
+  **Not done, and worth knowing about before this goes live:** existing contract-repository users (shared
+  with license-manager) still have a Google identity on their account; Supabase won't let a new SAML identity
+  attach to an email that already has one, so a user's first SSO sign-in can fail outright unless their old
+  Google identity is cleared first. No bulk migration step has been written or run — right now this only
+  changes which button the sign-in page shows and which code path runs; it hasn't been tried against a real
+  existing user yet. `VITE_SSO_PROVIDER_ID` also still needs to be set in Amplify's environment for the
+  deployed site, not just local `.env`.
+  `SETUP.md`, `README.md` and this file's Architecture section updated to match; `.env.example` gained
+  `VITE_SSO_PROVIDER_ID`. Verified: `npm run build` succeeds, `tests/ui/{pages,sheet_fields,users}.mjs` all
+  pass (same pre-existing `?decide=1` failure, unrelated) — none of them exercise the sign-in button itself,
+  since they all mock an already-authenticated session.
+- **Built (2026-11-23):** reconciled the visual-refresh branch (above) against `main`'s unification of
+  `ContractDetail.jsx`/`ContractForm.jsx` into `src/pages/ContractPage.jsx` (PR #14, merged while the
+  visual-refresh branch was still open as PR #15) — the two branches had independently redesigned the same
+  pages. Rebuilt on a fresh branch off current `main`, cherry-picking the SAML SSO commit (clean — it never
+  touched these files) and manually re-applying only the parts of the visual refresh that don't conflict
+  with choices `main` already made:
+  - Carried over: the `Card` icon-prop / `KeyFacts` stat-tile strip in `ui.jsx` (re-added; `main` never
+    touched this file) — `ContractPage.jsx` has its own local `Section`/`Group` components, not `ui.jsx`'s
+    `Card`, so `Section` got the same icon-prop treatment directly, plus a `KeyFacts` strip in its header;
+    `panels.jsx` got its icon chips back too. "Effective date" → **Start date**. The free-text "Renewal
+    notice terms (as written)" field removed (your "trash it" call from the design review — `main`'s
+    redesign never addressed this field either way, so no conflict). "Termination notice (days)" →
+    **Termination notice period (days)** with the same clarifying hint. The expiration-before-start-date
+    guard (`min` on the date picker + a friendly pre-save error, from the separate `contracts_check`
+    constraint fix) reapplied directly in `ContractPage.jsx`'s `submit()`. `notice_period_days` now
+    defaults to 30 for a new contract. Added **Vendor email** next to the existing Vendor contact field in
+    the vendor-kind "Vendor details" add-later section (stored in `details` jsonb like `vendor_contact`,
+    no migration) — kept in that add-later section rather than moved up to Essentials, since `main`'s
+    Essentials is a deliberately lean quick-add.
+  - **Not** carried over, because `main` explicitly decided differently: Backup owner, the reminders
+    on/off toggle, and the admin original-exception section all stayed (`main` kept them, reorganized
+    under "Ownership & visibility", rather than removing them). Visibility stayed a Standard/Restricted
+    select, not a checkbox. The section stayed named "System & subscription", not renamed "Administration".
+    Initial contract date and Contract length stayed required in Essentials (`main` went the opposite
+    direction from the visual-refresh branch on purpose). Department manager removal was already done by
+    `main`'s own `11_simplified_signers.sql` migration — nothing left to do there. Contract type was left
+    where `main` put it (grouped with Status in "The contract", not moved next to Vendor), since `main`
+    groups Essentials by concept (Vendor lives with the other Signers fields) rather than by field
+    adjacency, and moving it would have fought that grouping.
+  `tests/ui/sheet_fields.mjs` updated for the relabel and the removed field (including a genuine
+  absence check, not just a coincidental text match — the old detail-page "notice terms as written" check
+  happened to pass against the unrelated Notice-period-days value, "60 days" either way, so it wasn't
+  actually testing what it claimed to). Verified: `npm run build` succeeds, `tests/ui/{pages,sheet_fields,
+  users}.mjs` all pass (same pre-existing, unrelated `?decide=1` failure as every entry above).
 - **Open decision:** whether the sheet's "Other Systems" tab (many rows with no contract) is imported, and as
   what — on hold (2026-10-08), revisit later.
 - **Planned, not built:** import of the existing tracking sheet (it is confidential — don't commit it);

@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useLocation, Link } from 'react-router-dom'
-import { Pencil, ExternalLink } from 'lucide-react'
+import { Pencil, ExternalLink, FileText, DollarSign, CalendarDays, Settings2, ListChecks, Link2, Lock } from 'lucide-react'
 import {
   getContract, listTypes, listCounterparties, getDirectory, listContracts, findOrCreateCounterparty,
   saveContract, addSignatory,
 } from '../lib/contracts'
 import { listDocuments, uploadDocument, openDocument, MAX_BYTES } from '../lib/documents'
 import { fmtDate, fmtDateTime, fmtMoney, fmtBytes, daysUntil, STATUS_LABELS, RENEWAL_LABELS, SIGN_ON_LABELS, PROVISIONS } from '../lib/format'
-import { Page, SectionNav, StatusBadge, ErrorMsg, Loading, ConfidentialNote, Field, btnPrimary, btnSecondary, inputCls } from '../components/ui'
+import { Page, SectionNav, StatusBadge, ErrorMsg, Loading, ConfidentialNote, KeyFacts, Field, btnPrimary, btnSecondary, inputCls } from '../components/ui'
 import {
   DocumentsPanel, DecisionPanel, MilestonesPanel, LinksPanel, AccessPanel, RelationshipsPanel, SignatoriesPanel, HistoryPanel,
 } from '../components/contract/panels'
@@ -21,7 +21,7 @@ const EMPTY = {
   title: '', type_id: '', counterparty: '', owner_id: '', backup_owner_id: '',
   status: 'draft', effective_date: '', signed_date: '', expiration_date: '', evergreen: false,
   sensitivity: 'standard', tags: '', notes: '',
-  renewal_type: 'none', renewal_term: '', notice_period_days: '', termination_for_convenience: '', termination_notice_days: '',
+  renewal_type: 'none', renewal_term: '', notice_period_days: 30, termination_for_convenience: '', termination_notice_days: '',
   value_amount: '', currency: 'USD', payment_terms: '', billing_frequency: '', budget_code: '',
   amends_id: '', superseded_by_id: '', reminders_enabled: true, details: {}, provisions: {},
   system_name: '', counterparty_signer_name: '', counterparty_signed_date: '', annual_amount: '', annual_amount_note: '', mission_justification: '',
@@ -66,11 +66,18 @@ function Group({ title, children, note }) {
   )
 }
 
-function Section({ id, title, hint, children, essentials }) {
+function Section({ id, title, hint, children, essentials, icon: Icon }) {
   return (
     <section id={id} className={`bg-white rounded-xl shadow-sm border p-5 mb-5 scroll-mt-4 ${essentials ? 'border-brand/50 ring-4 ring-brand/10' : 'border-gray-100'}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 mb-3">
-        <h2 className={`font-semibold text-gray-800 ${essentials ? 'text-lg' : ''}`}>{title}</h2>
+        <div className="flex items-center gap-2.5">
+          {Icon && (
+            <span className="w-7 h-7 rounded-lg bg-brand/[0.09] text-brand flex items-center justify-center flex-shrink-0">
+              <Icon size={15} />
+            </span>
+          )}
+          <h2 className={`font-semibold text-gray-800 ${essentials ? 'text-lg' : ''}`}>{title}</h2>
+        </div>
         {hint && <span className="text-xs text-gray-500">{hint}</span>}
       </div>
       {children}
@@ -184,6 +191,9 @@ export default function ContractPage({ edit = false }) {
     setSaving(true); setError(null)
     try {
       if (!form.counterparty.trim()) throw new Error('Vendor is required.')
+      if (form.expiration_date && form.effective_date && form.expiration_date < form.effective_date) {
+        throw new Error('Expiration / next renewal date cannot be before the start date.')
+      }
       if (can.admin && form.no_original_exception && !form.no_original_reason.trim()) {
         throw new Error('A reason is required to mark the original as not on file.')
       }
@@ -266,6 +276,13 @@ export default function ContractPage({ edit = false }) {
   const provisionNames = PROVISIONS.filter(([k]) => form.provisions?.[k]).map(([, l]) => l)
   const hasDecision = !!id && contract?.status === 'active' && !!contract?.notice_deadline
 
+  const keyFacts = id ? [
+    { label: 'Status', value: STATUS_LABELS[contract.status] || contract.status },
+    { label: party, value: contract.counterparty?.name },
+    form.annual_amount !== '' && { label: 'Annual amount', value: fmtMoney(form.annual_amount, form.currency) },
+    contract.status === 'active' && contract.notice_deadline && { label: 'Notice deadline', value: fmtDate(contract.notice_deadline), tone: days <= 60 ? 'warn' : undefined },
+  ].filter(Boolean) : []
+
   const navItems = [
     { id: 'decision', label: 'Renewal decision', show: hasDecision },
     { id: 'essentials', label: 'Essentials' },
@@ -317,7 +334,7 @@ export default function ContractPage({ edit = false }) {
 
   const form_ = (
     <form id="contract-form" onSubmit={submit}>
-      <Section id="essentials" title="Essentials" essentials
+      <Section id="essentials" title="Essentials" essentials icon={FileText}
         hint={editing ? 'Enough to get started. Everything below can be added later.' : undefined}>
         <div className="grid md:grid-cols-2 gap-x-8 gap-y-6">
           <Group title="The contract">
@@ -352,8 +369,8 @@ export default function ContractPage({ edit = false }) {
             {fld('initial_contract_date', 'Initial contract date', { req: true, type: 'date', hint: 'When the very first agreement was made.', view: v => v && fmtDate(v) })}
             {fld('contract_length_years', 'Contract length (years)', { req: true, type: 'number', step: '0.1', min: 0,
               view: v => v !== '' && `${v} year${Number(v) === 1 ? '' : 's'}` })}
-            {fld('effective_date', 'Effective date', { req: true, type: 'date', view: v => v && fmtDate(v) })}
-            {fld('expiration_date', 'Expiration / next renewal date', { req: !form.evergreen, type: 'date', disabled: form.evergreen,
+            {fld('effective_date', 'Start date', { req: true, type: 'date', view: v => v && fmtDate(v) })}
+            {fld('expiration_date', 'Expiration / next renewal date', { req: !form.evergreen, type: 'date', disabled: form.evergreen, min: form.effective_date || undefined,
               view: (v, f) => (f.evergreen ? 'Evergreen — no fixed end date' : v && fmtDate(v)) })}
             {fld('notice_period_days', 'Notice period (days)', { req: true, type: 'number', min: 0,
               hint: 'Days before expiry that notice of non-renewal is due.',
@@ -375,7 +392,7 @@ export default function ContractPage({ edit = false }) {
         </div>
       </Section>
 
-      <Section id="ownership" title="Ownership & visibility" hint="Add later">
+      <Section id="ownership" title="Ownership & visibility" hint="Add later" icon={Lock}>
         <div className="grid md:grid-cols-2 gap-4">
           {fld('backup_owner_id', 'Backup owner', { options: [['', 'None'], ...people], view: v => nameOf(v), hint: 'Also receives reminders, and escalations.' })}
           {fld('sensitivity', 'Visibility', { noBlank: true, options: [['standard', 'Standard'], ['restricted', 'Restricted']],
@@ -408,7 +425,7 @@ export default function ContractPage({ edit = false }) {
       </Section>
 
       {hasFinancialLater && (
-        <Section id="financial" title="Financial details" hint="Add later">
+        <Section id="financial" title="Financial details" hint="Add later" icon={DollarSign}>
           <div className="grid md:grid-cols-3 gap-4">
             {fld('annual_amount_note', 'Annual amount: notes', { cls: 'md:col-span-3', hint: 'Anything that doesn’t fit a number: fees, “internal”, “free?”, “donated”.' })}
             {fld('currency', 'Currency', { maxLength: 3 })}
@@ -420,7 +437,7 @@ export default function ContractPage({ edit = false }) {
       )}
 
       {showSystem && (
-        <Section id="system" title="System & subscription" hint="Add later">
+        <Section id="system" title="System & subscription" hint="Add later" icon={Settings2}>
           <div className="grid md:grid-cols-2 gap-4">
             {fld('system_name', 'System / product', { hint: 'e.g. Zoom, Freshworks CRM: the thing the contract is for.' })}
             {fld('administrators', 'Administrator(s)', { hint: 'Names or email addresses.' })}
@@ -457,14 +474,14 @@ export default function ContractPage({ edit = false }) {
         </Section>
       )}
 
-      <Section id="terms" title="Renewal & termination" hint="Add later">
+      <Section id="terms" title="Renewal & termination" hint="Add later" icon={CalendarDays}>
         <div className="grid md:grid-cols-3 gap-4">
           {fld('last_renewal_date', 'Last renewal date', { type: 'date', view: v => v && fmtDate(v) })}
           {fld('renewal_type', 'Renewal type', { noBlank: true, options: Object.entries(RENEWAL_LABELS) })}
           {fld('renewal_term', 'Renewal term', { hint: 'e.g. 12 months' })}
-          {fld('notice_terms', 'Renewal notice terms (as written)', { hint: 'e.g. “60 days written notice”. The number of days above drives the reminders.' })}
           {fld('termination_for_convenience', 'Termination for convenience?', { options: TRI, view: v => triLabel(v) })}
-          {form.termination_for_convenience === 'true' && fld('termination_notice_days', 'Termination notice (days)', { type: 'number', min: 0 })}
+          {form.termination_for_convenience === 'true' && fld('termination_notice_days', 'Termination notice period (days)', { type: 'number', min: 0,
+            hint: 'Independent of the notice period above — this is how much notice is required to terminate, not to decline renewal.' })}
           {fld('termination_date', 'Termination date', { type: 'date', hint: 'When this contract was confirmed terminated or not renewed. Leave blank until that’s decided.',
             view: v => (v ? fmtDate(v)
               : (form.expiration_date && !form.evergreen && form.expiration_date < new Date().toISOString().slice(0, 10)
@@ -473,7 +490,7 @@ export default function ContractPage({ edit = false }) {
       </Section>
 
       {hasTypeDetails && kind === 'mou' && (
-        <Section id="type-details" title="MOU details" hint="Add later">
+        <Section id="type-details" title="MOU details" hint="Add later" icon={ListChecks}>
           <div className="grid md:grid-cols-2 gap-4">
             <DetailField {...{ editing, d, setDetail }} k="purpose" label="Purpose" area cls="md:col-span-2" />
             <DetailField {...{ editing, d, setDetail }} k="next_step" label="Expected next step" hint="e.g. definitive agreement" />
@@ -483,7 +500,7 @@ export default function ContractPage({ edit = false }) {
         </Section>
       )}
       {hasTypeDetails && kind === 'sow' && (
-        <Section id="type-details" title="SOW details" hint="Add later">
+        <Section id="type-details" title="SOW details" hint="Add later" icon={ListChecks}>
           <div className="grid md:grid-cols-2 gap-4">
             <DetailField {...{ editing, d, setDetail }} k="project_name" label="Project name" />
             <DetailField {...{ editing, d, setDetail }} k="deliverables" label="Deliverables summary" area cls="md:col-span-2" />
@@ -492,14 +509,15 @@ export default function ContractPage({ edit = false }) {
         </Section>
       )}
       {hasTypeDetails && kind === 'vendor' && (
-        <Section id="type-details" title="Vendor details" hint="Add later">
+        <Section id="type-details" title="Vendor details" hint="Add later" icon={ListChecks}>
           <div className="grid md:grid-cols-2 gap-4">
             <DetailField {...{ editing, d, setDetail }} k="vendor_contact" label="Vendor contact" />
+            <DetailField {...{ editing, d, setDetail }} k="vendor_email" label="Vendor email" type="email" />
           </div>
         </Section>
       )}
 
-      <Section id="related" title="Related & provisions" hint="Add later">
+      <Section id="related" title="Related & provisions" hint="Add later" icon={Link2}>
         <div className="grid md:grid-cols-2 gap-4">
           {fld('amends_id', 'This is an amendment to', { options: [['', 'Not an amendment'], ...contractOpts], view: v => contractOpts.find(([val]) => val === v)?.[1], hint: 'Links to the contract it amends.' })}
           {fld('superseded_by_id', 'Superseded by', { options: [['', 'Not superseded'], ...contractOpts], view: v => contractOpts.find(([val]) => val === v)?.[1] })}
@@ -545,6 +563,7 @@ export default function ContractPage({ edit = false }) {
           )}
         </div>
       )}
+      <KeyFacts facts={keyFacts} />
       <ErrorMsg error={error} />
       <div className="md:flex md:gap-8 md:items-start">
         <SectionNav items={navItems} orientation="left" title={id ? form.title : undefined} />
