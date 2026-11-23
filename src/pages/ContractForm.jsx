@@ -68,6 +68,9 @@ export default function ContractForm() {
     setSaving(true); setError(null)
     try {
       if (!form.counterparty.trim()) throw new Error('Vendor is required.')
+      if (form.expiration_date && form.effective_date && form.expiration_date < form.effective_date) {
+        throw new Error('Expiration / next renewal date cannot be before the start date.')
+      }
       const counterparty_id = await findOrCreateCounterparty(form.counterparty)
       const fields = {
         title: form.title.trim(), type_id: form.type_id, counterparty_id, owner_id: form.owner_id,
@@ -210,7 +213,7 @@ export default function ContractForm() {
             <Field label="Signed date (current term)" required>{text('signed_date', { type: 'date', required: true })}</Field>
             <Field label="Start date" required>{text('effective_date', { type: 'date', required: true })}</Field>
             <Field label="Last renewal date">{text('last_renewal_date', { type: 'date' })}</Field>
-            <Field label="Expiration / next renewal date" required={!form.evergreen} hint={form.evergreen ? 'Ignored while evergreen.' : 'The date the current term ends or renews.'}>{text('expiration_date', { type: 'date', disabled: form.evergreen, required: !form.evergreen })}</Field>
+            <Field label="Expiration / next renewal date" required={!form.evergreen} hint={form.evergreen ? 'Ignored while evergreen.' : 'The date the current term ends or renews.'}>{text('expiration_date', { type: 'date', min: form.effective_date || undefined, disabled: form.evergreen, required: !form.evergreen })}</Field>
             <label className="flex items-center gap-2 text-sm self-end pb-2">
               <input type="checkbox" checked={form.evergreen} onChange={e => set('evergreen', e.target.checked)} /> Evergreen (no fixed end date)
             </label>
