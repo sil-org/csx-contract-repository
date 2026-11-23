@@ -1,8 +1,11 @@
 import { supabase } from './supabase'
 
-export async function signInWithGoogle() {
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
+// This project's own SAML provider registration (auth.sso_providers / auth.saml_providers) —
+// shared with license-manager and helpdesk on the same Supabase project. VITE_SSO_PROVIDER_ID
+// must be set in the deployed environment (Amplify), not just .env locally.
+export async function signInWithSSO() {
+  const { error } = await supabase.auth.signInWithSSO({
+    providerId: import.meta.env.VITE_SSO_PROVIDER_ID,
     options: {
       redirectTo: `${window.location.origin}/auth/callback`,
     },
@@ -15,8 +18,8 @@ export async function signOut() {
   if (error) throw error
 }
 
-// Called after OAuth callback — finds or creates a profile for this Google account.
-// If a pendingLinkToken is in localStorage, links this account to the existing profile first.
+// Called after the SSO callback — finds or creates a profile for this SAML identity.
+// If a pendingLinkToken is in localStorage, links this identity to the existing profile first.
 export async function resolveProfile(authUser) {
   const pendingToken = localStorage.getItem('pendingLinkToken') || null
   if (pendingToken) localStorage.removeItem('pendingLinkToken')
