@@ -6,8 +6,10 @@ tool (no drafting, routing or signing). Requirements: `docs/REQUIREMENTS.md`. Se
 
 ## Architecture (decisions already made — don't relitigate without asking)
 - **Frontend:** React + Vite + Tailwind from `sil-app-template`, hosted on **AWS Amplify** (builds on push to `main`).
-- **Backend:** the **same Supabase project as `license-manager`** — same Google sign-in, same `profiles` /
-  `linked_accounts`. Because it is shared:
+- **Backend:** the **same Supabase project as `license-manager`** — same `profiles` / `linked_accounts`. Sign-in
+  is SAML SSO (`VITE_SSO_PROVIDER_ID`), the same provider registered project-wide (shared with license-manager
+  and helpdesk); this app is SSO-only — no Google button here (license-manager still offers Google alongside SSO
+  for its own existing users; don't assume this app follows that pattern). Because the project is shared:
   - Everything here is `contract_`-prefixed (or plainly contract-specific). **Never alter license-manager tables,
     types or functions**, and never touch the shared `user_role` enum.
   - **Contract roles are separate** (`contract_roles`: viewer / contributor / auditor / admin). A license-manager
@@ -33,7 +35,7 @@ tool (no drafting, routing or signing). Requirements: `docs/REQUIREMENTS.md`. Se
 
 ## Commands
 ```bash
-npm install && cp .env.example .env   # same VITE_SUPABASE_URL / ANON_KEY as license-manager
+npm install && cp .env.example .env   # same VITE_SUPABASE_URL / ANON_KEY / SSO_PROVIDER_ID as license-manager
 npm run dev                           # http://localhost:5173
 npm run build
 
@@ -258,6 +260,34 @@ keep the positive-control checks, and for a new rule, break it on purpose once t
   all pass against a local Vite dev server (same one pre-existing, unrelated `pages.mjs` `?decide=1` failure
   noted in earlier entries above). No `supabase/contracts/` migration was needed — nothing here touched the
   schema.
+- **Built (2026-11-23):** switched sign-in from Google OAuth to SAML SSO (`supabase.auth.signInWithSSO`),
+  **this app only** — license-manager (and helpdesk) are a separate move, deliberately done one at a time so
+  each can be tested on its own; license-manager is keeping Google alongside SSO for its own existing users,
+  contract-repository is SSO-only. The SAML IdP itself was already registered on the shared Supabase project
+  (coordinated with the license-manager session, not done here) — nothing to register for this app.
+  `src/lib/auth.js`'s `signInWithGoogle()` → `signInWithSSO()`, reading the provider UUID from the new
+  `VITE_SSO_PROVIDER_ID` env var (same name/value as license-manager's, for consistency — not shared at
+  runtime, just convention); `src/pages/Home.jsx`'s Google button replaced with a generic SSO button (no
+  provider-branded icon, since this account's identity isn't tied to Google any more); `AuthCallback.jsx`'s
+  comment updated (behavior unchanged — it's provider-agnostic, just waits for a session). `resolveProfile()`
+  and `AuthContext.jsx` needed no changes; they were already provider-agnostic.
+  Checked the shared `resolve_profile()` RPC (in license-manager's `supabase/schema.sql`, which this repo's
+  SQL tests and this live project both depend on but never edits) before touching anything: it already derives
+  identity only from `auth.uid()`/`auth.users` and ignores the legacy `p_supabase_user_id`/`p_email`
+  parameters — a client-supplied-identity hole that's documented there as already fixed. No `auth.users`
+  provisioning trigger exists either; profile creation is solely through that RPC. Neither needed any action
+  here.
+  **Not done, and worth knowing about before this goes live:** existing contract-repository users (shared
+  with license-manager) still have a Google identity on their account; Supabase won't let a new SAML identity
+  attach to an email that already has one, so a user's first SSO sign-in can fail outright unless their old
+  Google identity is cleared first. No bulk migration step has been written or run — right now this only
+  changes which button the sign-in page shows and which code path runs; it hasn't been tried against a real
+  existing user yet. `VITE_SSO_PROVIDER_ID` also still needs to be set in Amplify's environment for the
+  deployed site, not just local `.env`.
+  `SETUP.md`, `README.md` and this file's Architecture section updated to match; `.env.example` gained
+  `VITE_SSO_PROVIDER_ID`. Verified: `npm run build` succeeds, `tests/ui/{pages,sheet_fields,users}.mjs` all
+  pass (same pre-existing `?decide=1` failure, unrelated) — none of them exercise the sign-in button itself,
+  since they all mock an already-authenticated session.
 - **Open decision:** whether the sheet's "Other Systems" tab (many rows with no contract) is imported, and as
   what — on hold (2026-10-08), revisit later.
 - **Planned, not built:** import of the existing tracking sheet (it is confidential — don't commit it);

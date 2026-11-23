@@ -1,9 +1,10 @@
 # Setup
 
-This app runs in the **same Supabase project as license-manager** and signs in the same way, so
-most of the usual "new app" setup is already done. Do these in order.
+This app runs in the **same Supabase project as license-manager** and signs in via the same SAML
+SSO provider (not Google — license-manager still offers Google alongside SSO for now, but this app
+is SSO-only), so most of the usual "new app" setup is already done. Do these in order.
 
-## 1. Supabase (existing project — no new project, no new Google OAuth client)
+## 1. Supabase (existing project — no new project, no new SSO provider to register)
 
 1. **Run the schema.** SQL Editor → new query → paste and run
    [`supabase/contracts/01_contracts_schema.sql`](supabase/contracts/01_contracts_schema.sql).
@@ -24,8 +25,9 @@ most of the usual "new app" setup is already done. Do these in order.
 2. **Allow this app's URLs.** Authentication → URL Configuration → add to **Redirect URLs**:
    `https://YOUR_DOMAIN/auth/callback` and `http://localhost:5173/auth/callback`.
    Leave **Site URL** alone — it belongs to license-manager.
-3. **Google Cloud** (the existing OAuth client): add `https://YOUR_DOMAIN` (and `http://localhost:5173`)
-   under *Authorised JavaScript origins*. The redirect URI (Supabase's `/auth/v1/callback`) is unchanged.
+3. **Set `VITE_SSO_PROVIDER_ID`** (in `.env` locally, and in Amplify's environment variables for the
+   deployed site) to the same SAML provider UUID already registered on this shared project — no new
+   IdP registration needed here. There's nothing else to configure for sign-in itself.
 4. **Make yourself the first contract admin.** Sign in to the app once (you'll land on "Access needed"), then:
    ```sql
    insert into contract_roles (profile_id, role)
